@@ -37,38 +37,31 @@ The problem is quantifiable by comparing the original MIDI track with the MIDI t
 
 In order to use a neural network and keep the output space small, I searched for a large audio/MIDI dataset with short, paired clips. Unfortunately, I did not find such a dataset, but I did find the Saarland Music Data. This dataset consists of 50 audio files and their temporally synchronized 50 MIDI files. I reduced the information in the MIDI file by first looking at the MIDI track in each file with the most messages, and using the most relevant information in each message. That information is whether a note is on or off, the pitch of each note turning on or off (represented as a MIDI value ranging from 0 to 127), and the MIDI time (delta ticks - the number of MIDI ticks since the last message). 
 
-In order to increase my number of data points and have inputs small enough to feed into a neural network, I will segment the songs into short clips n seconds long. Additionally, for a neural network, the inputs must all have the same shape. Thus, if a song's length is not divisible by n, the song will be padded with silence at the end of the track. The same will be done for it's corresponding MIDI clip when the MIDI file is segmented into corresponding clips n seconds long. 
+In order to increase my number of data points and have inputs small enough to feed into a neural network, I will segment the songs into short clips n seconds long. Additionally, for a neural network, the inputs must all have the same shape. Thus, if a song's length is not divisible by n, the song will be padded with silence at the end of the track. The same will be done for it's corresponding MIDI clip when the MIDI file is segmented into corresponding clips n seconds long.
 
-For the MIDI messages, the pitch value will be one-hot encoded. A pitch not being played will be represented with a 0. A pitch being played will be represented with a 1. The output size will be as follows: 2*number of possible pitches* 
+There are several ways to represent audio in such a way that it can be fed into a neural network (or otherwise analyzed), such as a short-time Fourier transform or constant-Q transform. I intend to use librosa's CQT function, which will ouput a numpy array with shape (n bins, time), the constant-Q value each frequency at each time.
+
+For the MIDI messages, the pitch value will be one-hot encoded. A pitch not being played will be represented with a 0. A pitch being played will be represented with a 1. The output size will be as follows: 2 * 128 possible pitches * number of possible discrete time values. 
 
 Saarland Music Data:
 https://www.audiolabs-erlangen.de/resources/MIR/SMD/midi
 Meinard Müller, Verena Konz, Wolfgang Bogler, Vlora Arifi-Müller: Saarland Music Data (SMD). In Late-Breaking and Demo Session of the 12th International Conference on Music Information Retrieval (ISMIR), 2011.
 
 ### Solution Statement
-_(approx. 1 paragraph)_
 
-For the purpose of keeping the output space small, note onsets and/or offsets will be at one of 12 ticks per beat. With four beats per MIDI file, the output space size is 48 ticks * 128 possible note values * 2 on/off. I will train a neural network on 75-80% of the data in order for it to predict these values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem. This project will include the code which segments the Saarland Music Data as well as the segmented dataset.
+I will train a neural network on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem. This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
 
 ### Benchmark Model
-_(approximately 1-2 paragraphs)_
 
-My benchmark for this will be chance: given an audio will return a random midi file from the dataset.
-
-an output which has a correct value for 50% of its values, and a random value (more likely to be a zero than a one) for the remaining 50%. The benchmark shape will be the same as the NN output. The same evaluation metrics will be applied. 
+My benchmark for this will be chance: Given an audio file, the benchmark will return a random midi file from the dataset. The same evaluation metrics will be applied. 
 
 ### Evaluation Metrics
-_(approx. 1-2 paragraphs)_
 
-Given that this is a regression problem, mean absolute error, mean squared error, and   will be used to quantify the performance of the benchmark and the neural network. 
-
- 
+Given that this is a regression problem, mean absolute error, mean squared error, and R2 score will be used to quantify the performance of the benchmark and the neural network. 
 
 These evaluation metrics will likely be utilized via a library such as keras. If not, they will be otherwise implemented in code.
 
-
 ### Project Design
-_(approx. 1 page)_
 
 Having the data prepared into four-beat segments, the next step is to encode the audio input to a format suitable to a neural network, making all audio inputs the same shape. This will likely involve a Fourier transform of some kind (standard, Short Term, or Fast). Additionally, I’ll one-hot encode the MIDI files. I plan to implement a Convolutional or Recurrent Neural Network. 
 
