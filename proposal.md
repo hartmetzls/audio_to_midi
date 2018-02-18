@@ -39,7 +39,7 @@ In order to use a neural network and keep the output space small, I searched for
 
 In order to increase my number of data points and have inputs small enough to feed into a neural network, I will segment the songs into short clips n seconds long. Additionally, for a neural network, the inputs must all have the same shape. Thus, if a song's length is not divisible by n, the song will be padded with silence at the end of the track. The same will be done for it's corresponding MIDI clip when the MIDI file is segmented into corresponding clips n seconds long.
 
-There are several ways to represent audio in such a way that it can be fed into a neural network (or otherwise analyzed), such as a short-time Fourier transform or constant-Q transform. I intend to use librosa's CQT function, which will ouput a numpy array with shape (n bins, time), the constant-Q value each frequency at each time.
+There are several ways to represent audio in such a way that it can be fed into a neural network (or otherwise analyzed), such as a short-time Fourier transform and constant-Q transform. Both are time-frequency representations. I intend to use librosa's CQT function, which will ouput a numpy array with shape (n bins, time), the constant-Q value each frequency at each time. 
 
 For the MIDI messages, the pitch value will be one-hot encoded. A pitch not being played will be represented with a 0. A pitch being played will be represented with a 1. The output size will be as follows: 2 * 128 possible pitches * number of possible discrete time values. 
 
