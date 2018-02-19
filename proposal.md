@@ -51,7 +51,7 @@ Meinard Müller, Verena Konz, Wolfgang Bogler, Vlora Arifi-Müller: Saarland Mus
 
 Because of the way we can segment and shape audio data and because neural networks are well-suited for handling data of multiple dimensions, sMy first attempt will use a Convolutional Neural Network. CNNs are well-suited for problems where the spatial information of the input (in this case, the presence of notes over time) needs to be preserved. In previous automatic music transcription research, such as An End-to-End Neural Network for Polyphonic Piano Music Transcription, CNNs have proven to be relatively effective at this task.
 
-I plan to construct a CNN of multiple layers. For the most part, I will place a max pooling layer after every on e oro two convolutional layers. I'll experiment with multiple activation functions (ReLU, Sigmoid, tanh, softmax). I plan to train the NN on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem. This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
+I plan to construct a CNN of multiple layers. For the most part, I will place a max pooling layer after every on e oro two convolutional layers. I'll experiment with multiple activation functions, including ReLU, Sigmoid, softmax. I plan to train the NN on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem. This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
 
 ### Benchmark Model
 
