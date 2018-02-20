@@ -49,23 +49,23 @@ Meinard Müller, Verena Konz, Wolfgang Bogler, Vlora Arifi-Müller: Saarland Mus
 
 ### Solution Statement
 
-Because of the way we can segment and shape audio data and because neural networks are well-suited for handling data of multiple dimensions, sMy first attempt will use a Convolutional Neural Network. CNNs are well-suited for problems where the spatial information of the input (in this case, the presence of notes over time) needs to be preserved. In previous automatic music transcription research, such as An End-to-End Neural Network for Polyphonic Piano Music Transcription, CNNs have proven to be relatively effective at this task.
+Because of the way we can segment and shape audio data and because neural networks are well-suited for handling data of multiple dimensions, my first attempt will use a Convolutional Neural Network. CNNs are well-suited for problems for which the spatial information of the input (in this case, the presence of notes over time) needs to be preserved. In previous automatic music transcription research, such as An End-to-End Neural Network for Polyphonic Piano Music Transcription (referenced above), CNNs have proven to be relatively effective at determine pitches present within a given time frame.
 
-I plan to construct a CNN of multiple layers. For the most part, I will place a max pooling layer after every on e oro two convolutional layers. I'll experiment with multiple activation functions, including ReLU, Sigmoid, softmax. I plan to train the NN on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem. This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
+I plan to construct a CNN of multiple layers. I intend to try multiple layer combinations. I expect my final network will have a max pooling layer after every one or two convolutional layers. I'll experiment with multiple activation functions, including ReLU, Sigmoid, softmax. I plan to train the NN on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem (details below). This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
 
 ### Benchmark Model
 
-My benchmark for this will be chance: Given an audio file, the benchmark will return a random midi file from the dataset. The same evaluation metrics will be applied. 
+My benchmark for this will be chance: Given an audio file, the benchmark will return a random midi file from the dataset. The same evaluation metrics will be applied to the benchmark and the final model. 
 
 ### Evaluation Metrics
 
-Given that this is a regression problem, mean absolute error, mean squared error, and R2 score will be used to quantify the performance of the benchmark and the neural network. 
-
-These evaluation metrics will likely be utilized via a library such as keras. If not, they will be otherwise implemented in code.
+Given that this is a regression problem, mean absolute error, mean squared error, and R2 score will be used to quantify the performance of the benchmark and the neural network. These evaluation metrics will likely be utilized via a library such as keras. If not, they will be otherwise implemented in code.
 
 ### Project Design
 
-Having the data prepared into four-beat segments, the next step is to encode the audio input to a format suitable to a neural network, making all audio inputs the same shape. This will likely involve a Fourier transform of some kind (standard, Short Term, or Fast). Additionally, I’ll one-hot encode the MIDI files. I plan to implement a Convolutional or Recurrent Neural Network. 
+The theoretical workflow for the rest of this project is as follows. I will first need to complete the audio processing, by which I mean I'll segment the audio and MIDI into clips based on seconds (this is 95% done) and pad any short samples from the end of a track with silent audio and silent MIDI. The function to remove extraneous information from the MIDI file is complete, so each MIDI files at this point is a (Python) list of messages. The function which will one-hot encode the MIDI output still needs to be written. The portion of code which will perform the constant-Q transform (or STFT) on the audio files is complete. Once this processing is complete, the code to establish the benchmark will be the next task.
+
+
 
 -----------
 
