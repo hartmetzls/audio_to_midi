@@ -51,7 +51,7 @@ Meinard Müller, Verena Konz, Wolfgang Bogler, Vlora Arifi-Müller: Saarland Mus
 
 Because of the way we can segment and shape audio data and because neural networks are well-suited for handling data of multiple dimensions, my first attempt will use a Convolutional Neural Network. CNNs are well-suited for problems for which the spatial information of the input (in this case, the presence of notes over time) needs to be preserved. In previous automatic music transcription research, such as An End-to-End Neural Network for Polyphonic Piano Music Transcription (referenced above), CNNs have proven to be relatively effective at determine pitches present within a given time frame.
 
-I plan to construct a CNN of multiple layers. I intend to try multiple layer combinations. I expect my final network will have a max pooling layer after every one or two convolutional layers. I'll experiment with multiple activation functions, including ReLU, Sigmoid, softmax. I plan to train the NN on 75-80% of the data in order for it to predict the MIDI values for the testing set. The neural network’s output will be evaluated by the standard metrics for a regression problem (details below). This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
+I plan to construct a CNN of multiple layers. I intend to try multiple layer combinations. I expect my final network will have a pooling layer after every one or two convolutional layers. I'll experiment with multiple activation functions, including ReLU, Sigmoid, softmax. I plan to train the NN on 75% of the data in order for it to predict the MIDI values for the testing set. The remaining data will be reserved for validation (12%) and testing (13%). The neural network’s output will be evaluated by the standard metrics for a regression problem (details below). This project will include the code to segment the Saarland Music Data as well as the segmented dataset itself.
 
 ### Benchmark Model
 
@@ -65,14 +65,4 @@ Given that this is a regression problem, mean absolute error, mean squared error
 
 The theoretical workflow for the rest of this project is as follows. I will first need to complete the audio processing, by which I mean I'll segment the audio and MIDI into clips based on seconds (this is 95% done) and pad any short samples from the end of a track with silent audio and silent MIDI. The function to remove extraneous information from the MIDI file is complete, so each MIDI files at this point is a (Python) list of messages. The function which will one-hot encode the MIDI output still needs to be written. The portion of code which will perform the constant-Q transform (or STFT) on the audio files is complete. Once this processing is complete, the code to establish the benchmark will be the next task.
 
-
-
------------
-
-**Before submitting your proposal, ask yourself. . .**
-
-- Does the proposal you have written follow a well-organized structure similar to that of the project template?
-- Is each section (particularly **Solution Statement** and **Project Design**) written in a clear, concise and specific fashion? Are there any ambiguous terms or phrases that need clarification?
-- Would the intended audience of your project be able to understand your proposal?
-- Have you properly proofread your proposal to assure there are minimal grammatical and spelling mistakes?
-- Are all the resources used for this project correctly cited and referenced?
+The first CNN architecture I plan to try will be a keras Sequential model. As mentioned above, I will likely place a pooling layer after every one or two convolutional layers. The final layer will match the output dimensions. After the architecture is defined, I'll compile and train the model. I'll experiment with multiple numbers of epochs. At this point I'll test the benchmark and the model with the data reserved for testing and compare the two using the same evaluation metrics. Finally, I will be able to draw conclusions about whether or not neural networks could be useful for audio to MIDI conversion.
