@@ -8,7 +8,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         # time_series_and_sr = load_audio(audio_file)
-#         # every_fourth_timestamp_array = find_fourth_beats(audio_file, time_series_and_sr)
+#         # every_fourth_timestamp_array = timestamp_array(audio_file, time_series_and_sr)
 #         midi_file = load_midi(audio_file)
 #         dumbed_down_track, _ = create_dumbed_down_midi(midi_file)
 #         previous_message_time = 0
@@ -24,7 +24,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         time_series_and_sr = load_audio(audio_file)
-#         every_fourth_timestamp_array = find_fourth_beats(audio_file, time_series_and_sr)
+#         every_fourth_timestamp_array = timestamp_array(audio_file, time_series_and_sr)
 #         previous_timestamp = 0
 #         for time in every_fourth_timestamp_array:
 #             assert previous_timestamp <= time, "time out of order (time out of mind)"
