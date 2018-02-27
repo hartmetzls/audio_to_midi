@@ -46,16 +46,21 @@ def load_audio(audio_file):
 
 def timestamp_array(audio_file, time_series_and_sr):
     duration_song = librosa.core.get_duration(y=time_series_and_sr[0], sr=time_series_and_sr[1])
-    audio_segment_length = 1
-    midi_segment_length = 0.5
+    audio_segment_length = 26
+    midi_segment_length = 13
     padding = midi_segment_length / 2
     start = 0
-    timestamps = np.arange(0,duration_song+audio_segment_length,padding)
-    for timestamp in timestamps:
+    range_array = np.arange((1-padding),(duration_song-padding),audio_segment_length)
+    audio_timestamps = np.concatenate((np.asarray([0]), range_array), axis=0)
+    #TODO: Add backk in timestamp array for not padding audio input
+    for timestamp in audio_timestamps:
         load_segment_of_audio_and_save(audio_file, start, audio_segment_length,
                                        midi_segment_length, duration_song)
-        start = timestamp - midi_segment_length
-    return timestamps, audio_segment_length, midi_segment_length
+        if start == 0:
+            start = padding
+        else:
+            start = timestamp - midi_segment_length
+    return audio_timestamps, audio_segment_length, midi_segment_length
 
 def silent_audio(sr, midi_segment_length):
     padding = midi_segment_length / 2
@@ -63,28 +68,38 @@ def silent_audio(sr, midi_segment_length):
     audio = np.zeros((zeros)) #TODO: Double check that this var actually specifies length in secs
     maxv = np.iinfo(np.int16).max #numpy.iinfo(type): Machine limits for integer types.
     silent_audio_time_series = (audio * maxv).astype(np.int16)
-    # librosa.output.write_wav("C:/Users/Lilly/audio_and_midi/out_int16.wav", silent_audio_time_series, rate)
+    librosa.output.write_wav("C:/Users/Lilly/audio_and_midi/out_int16.1.wav", silent_audio_time_series, rate)
     return silent_audio_time_series
 
 def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi_segment_length,
                                    duration_song):
     padding = midi_segment_length / 2
 
-    # Comment out the following code if you don't want to pad the audio segments
-    if start == (-midi_segment_length):
-        audio_segment_time_series, sr = librosa.core.load(audio_file, offset=0,
-                                                          duration=(audio_segment_length - padding))
-        audio_segment_time_series = np.concatenate((silent_audio(sr, midi_segment_length), audio_segment_time_series), axis=0)
-    if start == duration_song:
-        audio_segment_time_series, sr = librosa.core.load(audio_file, offset=start,
+    # If you don't want to pad the audio segments, comment out the following code and move the
+    # block inside the else condition out of the else condition
+    if start == 0:
+        segment_duration = (audio_segment_length - padding)
+        audio_segment_time_series_og, sr = librosa.core.load(audio_file, offset=0,
+                                                          duration=segment_duration)
+        audio_segment_time_series = np.concatenate((silent_audio(sr, midi_segment_length), audio_segment_time_series_og), axis=0)
+        filename = "C:/Users/Lilly/audio_and_midi/segments/audio/" + ntpath.basename(audio_file)[
+                                                                     :-4] + "_end_time" + str(segment_duration) + ".wav"
+        librosa.output.write_wav(filename, audio_segment_time_series, sr)
+    elif start == (duration_song - (1-padding)):
+        audio_segment_time_series_og, sr = librosa.core.load(audio_file, offset=start,
                                                           duration=audio_segment_length - padding)
-        audio_segment_time_series = np.concatenate((audio_segment_time_series, silent_audio(sr, midi_segment_length)),axis=0)
+        audio_segment_time_series = np.concatenate((audio_segment_time_series_og, silent_audio(sr, midi_segment_length)),axis=0)
+        filename = "C:/Users/Lilly/audio_and_midi/segments/audio/" + ntpath.basename(audio_file)[
+                                                                     :-4] + "_end_time" + str(
+            audio_segment_length + start) + ".wav"
+        librosa.output.write_wav(filename, audio_segment_time_series, sr)
 
     else:
         audio_segment_time_series, sr = librosa.core.load(audio_file, offset=start, duration=audio_segment_length)
-
-    filename = "C:/Users/Lilly/audio_and_midi/segments/audio/" + ntpath.basename(audio_file)[:-4] + str(audio_segment_length + start) + ".wav"
-    librosa.output.write_wav(filename, audio_segment_time_series, sr)
+        filename = "C:/Users/Lilly/audio_and_midi/segments/audio/" + ntpath.basename(audio_file)[
+                                                                     :-4] + "_end_time" + str(
+            audio_segment_length + start) + ".wav"
+        librosa.output.write_wav(filename, audio_segment_time_series, sr)
 
 def load_midi(audio_file):
     #africa and Bach are both type 1 MIDI, meaning all tracks start at the same time
@@ -116,8 +131,8 @@ def create_dumbed_down_midi(midi_file):
 def chop_dumbed_down_midi(midi_file, audio_segment_length):
     midi_segment_length = audio_segment_length / 2
     length_in_secs = int(round(midi_file.length)) #if this deosn't work, try length from audio
-    stop = length_in_secs+audio_segment_length
-    timestamps = np.arange(1,stop,midi_segment_length)
+    stop = length_in_secs + audio_segment_length
+    timestamps = np.arange(midi_segment_length,stop,midi_segment_length)
     dumbed_down_midi, absolute_ticks_last_note = create_dumbed_down_midi(midi_file)
     time_so_far = -1
     # TODO: Fix midi clips so that notes hanging over from the previous clip are represented with a note on in their following clip Done, right?
@@ -168,10 +183,10 @@ def reconstruct_midi(midi_file, midi_segments, absolute_ticks_last_note, length_
         mid.tracks.append(track)
         for message in delta_time_midi_segment:
             track.append(Message(message[0], note=message[1], time=message[-1]))
+        str_end_time = str(
+            midi_segment[0])
         filename = "C:/Users/Lilly/audio_and_midi/segments/midi/" + midi_file.filename[
-                                                                      35:-4] + str(
-            midi_segment[0]) + ".mid"
-        # print("reconstructed mid ticks per beat", mid.ticks_per_beat)
+                                                                      35:-4] + "_end_time" + str_end_time + ".mid"
         mid.save(filename)
     return
 
@@ -180,7 +195,7 @@ def preprocess_audio():
     audio_files_no_duplicates = find_audio_files(directory_str_audio)
     for audio_file in audio_files_no_duplicates:
         time_series_and_sr = load_audio(audio_file)
-        timestamps, audio_segment_length, midi_segment_length = timestamp_array(audio_file, time_series_and_sr)
+        audio_timestamps, audio_segment_length, midi_segment_length = timestamp_array(audio_file, time_series_and_sr)
         midi_file = load_midi(audio_file)
         midi_segments, absolute_ticks_last_note = chop_dumbed_down_midi(midi_file, audio_segment_length)
         midi_segments_plus_onsets = add_note_onsets_to_beginning_when_needed(midi_segments)
