@@ -8,7 +8,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         # time_series_and_sr = load_audio(audio_file)
-#         # every_fourth_timestamp_array = timestamp_array(audio_file, time_series_and_sr)
+#         # every_fourth_timestamp_array = timestamps_and_call_load_segment(audio_file, time_series_and_sr)
 #         midi_file = load_midi(audio_file)
 #         dumbed_down_track, _ = create_dumbed_down_midi(midi_file)
 #         previous_message_time = 0
@@ -24,7 +24,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         time_series_and_sr = load_audio(audio_file)
-#         every_fourth_timestamp_array = timestamp_array(audio_file, time_series_and_sr)
+#         every_fourth_timestamp_array = timestamps_and_call_load_segment(audio_file, time_series_and_sr)
 #         previous_timestamp = 0
 #         for time in every_fourth_timestamp_array:
 #             assert previous_timestamp <= time, "time out of order (time out of mind)"
@@ -39,3 +39,35 @@ from create_dataset import *
 #         duration = librosa.core.get_duration(time_series_and_sr[0], time_series_and_sr[1])
 #         assert int(round(midi_file.length)) == duration, "not equal. ahahfdsakfhdeff!"
 
+def test_if_audio_segments_are_same_shape():
+    directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+    audio_files_no_duplicates = find_audio_files(directory_str_audio)
+    for audio_file in audio_files_no_duplicates:
+        time_series_and_sr = load_audio(audio_file)
+        sr = time_series_and_sr[1]
+        duration_song = librosa.core.get_duration(y=time_series_and_sr[0], sr=sr)
+        audio_segment_length = 1
+        midi_segment_length = .5
+        padding = midi_segment_length / 2
+        audio_start_times_missing_first = np.arange(
+            padding, (duration_song - midi_segment_length), midi_segment_length)
+        # For ex,
+        # this will mean that for a song of len 157, the last needed MIDI file would be 156.5-157,
+        # so the last audio start time should be 156.25. In this example
+        # duration_song-midi_segment_length would be 156.5
+        audio_start_times = np.concatenate((np.asarray([0]), audio_start_times_missing_first),
+                                           axis=0)
+        audio_segment_time_series_first = load_segment_of_audio_and_save(audio_file,
+                                                                   audio_start_times[0],
+                                                                   audio_segment_length,
+                                                                   midi_segment_length,
+                                                                   duration_song, sr)
+        shape_first_segment = audio_segment_time_series_first.shape
+        for start_time in audio_start_times:
+            audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
+                                                                       audio_segment_length,
+                                                                       midi_segment_length,
+                                                                       duration_song, sr)
+            assert shape_first_segment == audio_segment_time_series.shape, "segments are not all " \
+                                                                           "the same shape!"
+        return audio_start_times, audio_segment_length, midi_segment_length
