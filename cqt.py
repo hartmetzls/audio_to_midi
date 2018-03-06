@@ -1,4 +1,4 @@
-from create_dataset import find_audio_files, load_audio, create_dumbed_down_midi
+from create_dataset import find_audio_files, load_audio, create_simplified_midi
 import librosa
 import ntpath
 from mido import MidiFile
@@ -38,7 +38,7 @@ def explore_stft():
                    + \
                    ".mid"
         midi_file = MidiFile(midi_str)
-        dumbed_down_midi = create_dumbed_down_midi(midi_file)
+        dumbed_down_midi = create_simplified_midi(midi_file)
         print("ticks since start:", (dumbed_down_midi[1]))
 
 def main():
