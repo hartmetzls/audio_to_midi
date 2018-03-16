@@ -9,7 +9,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         # time_series_and_sr = load_audio(audio_file)
-#         # every_fourth_timestamp_array = timestamps_and_call_load_segment(audio_file, time_series_and_sr)
+#         # every_fourth_timestamp_array = audio_timestamps(audio_file, time_series_and_sr)
 #         midi_file = load_midi(audio_file)
 #         dumbed_down_track, _ = create_simplified_midi(midi_file)
 #         previous_message_time = 0
@@ -25,7 +25,7 @@ from create_dataset import *
 #     audio_files_no_duplicates = find_audio_files(directory_str_audio)
 #     for audio_file in audio_files_no_duplicates:
 #         time_series_and_sr = load_audio(audio_file)
-#         every_fourth_timestamp_array = timestamps_and_call_load_segment(audio_file, time_series_and_sr)
+#         every_fourth_timestamp_array = audio_timestamps(audio_file, time_series_and_sr)
 #         previous_timestamp = 0
 #         for time in every_fourth_timestamp_array:
 #             assert previous_timestamp <= time, "time out of order (time out of mind)"
@@ -94,12 +94,45 @@ from create_dataset import *
 #     audio_files = librosa.util.find_files(directory_str_audio, recurse=False, case_sensitive=True)
 #     assert len(audio_files) == len(set(audio_files)), "there are duplicates"
 
-def test_note_off_for_every_note_on():
+# def test_note_off_for_every_note_on():
+#     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+#     audio_files = find_audio_files(directory_str_audio)
+#     for audio_file in audio_files:
+#         time_series_and_sr = load_audio(audio_file)
+#         audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
+#             audio_file, time_series_and_sr)
+#         midi_file = load_midi(audio_file)
+#
+#         # See time differences
+#         duration = librosa.core.get_duration(time_series_and_sr[0], time_series_and_sr[1])
+#         midi_len = midi_file.length
+#         # if midi_len != duration:
+#         # print(audio_file, "audio len - midi len:", duration-midi_len)
+#
+#         midi_segments, absolute_ticks_last_note, length_in_secs_full_song = chop_simplified_midi(
+#             midi_file, midi_segment_length)
+#         midi_segments_plus_onsets = \
+#             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
+#         for start_time_and_messages in midi_segments_plus_onsets:
+#             messages = start_time_and_messages[1]
+#             for pitch in range(0,128):
+#                 count_note_on = 0
+#                 count_note_off = 0
+#                 for message in messages:
+#                     message_type = message[0]
+#                     message_pitch = message[1]
+#                     if message_type == 'note_on' and message_pitch == pitch:
+#                         count_note_on += 1
+#                     if message_type == 'note_off' and message_pitch == pitch:
+#                         count_note_off += 1
+#                 assert count_note_on == count_note_off, "inequal num ons and offs"
+
+def test_no_midi_too_long():
     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
     for audio_file in audio_files:
         time_series_and_sr = load_audio(audio_file)
-        audio_start_times, audio_segment_length, midi_segment_length = timestamps_and_call_load_segment(
+        audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
             audio_file, time_series_and_sr)
         midi_file = load_midi(audio_file)
 
@@ -114,15 +147,12 @@ def test_note_off_for_every_note_on():
         midi_segments_plus_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
         for start_time_and_messages in midi_segments_plus_onsets:
-            messages = start_time_and_messages[1]
-            for pitch in range(0,128):
-                count_note_on = 0
-                count_note_off = 0
-                for message in messages:
-                    message_type = message[0]
-                    message_pitch = message[1]
-                    if message_type == 'note_on' and message_pitch == pitch:
-                        count_note_on += 1
-                    if message_type == 'note_off' and message_pitch == pitch:
-                        count_note_off += 1
-                assert count_note_on == count_note_off, "inequal num ons and offs"
+            messages = start_time_and_messages[-1]
+            if len(messages) > 0:
+                last_message = messages[-1]
+                last_time = last_message[-1]
+                first_message = messages[0]
+                first_time = first_message[-1]
+                assert last_time - first_time <= midi_segment_length, "overly long MIDI segment " \
+                                                                      "created"
+                #TODO: Check that this is still true after the MIDI is reconstructed

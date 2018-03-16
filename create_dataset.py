@@ -7,7 +7,14 @@ from collections import defaultdict
 
 #seaborn makes plots prettier
 import seaborn
+from cqt import *
+from collections import namedtuple
+
+# needed for jupyter notebook support
 seaborn.set(style='ticks')
+
+# Data Types
+AudioDecoded = namedtuple('AudioDecoded', ['time_series', 'sr'])
 
 #audio playback widget
 # from IPython.display import Audio
@@ -19,9 +26,12 @@ def find_audio_files(directory_str_audio):
     # listed twice
     return audio_files
 
+
+
 def load_audio(audio_file):
-    floating_point_time_series, sr = librosa.core.load(audio_file, sr=22050*4)
-    time_series_and_sr = [floating_point_time_series, sr]
+    time_series, sr = librosa.core.load(audio_file, sr=22050*4)
+
+    time_series_and_sr = AudioDecoded(time_series, sr)
 
     # with open('filename.pickle', 'wb') as handle:
     #     pickle.dump(time_serieses_and_srs, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -36,7 +46,7 @@ def load_audio(audio_file):
 # things like when it sees the start of a wave it doesn't know if it's halfway up the wave or not
 #  (this may or may not be a problem)
 
-def timestamps_and_call_load_segment(audio_file, time_series_and_sr):
+def audio_timestamps(audio_file, time_series_and_sr):
     sr = time_series_and_sr[1]
     duration_song = librosa.core.get_duration(y=time_series_and_sr[0], sr=sr)
     audio_segment_length = 1
@@ -50,10 +60,6 @@ def timestamps_and_call_load_segment(audio_file, time_series_and_sr):
             # duration_song-midi_segment_length would be 156.5
     audio_start_times = np.concatenate((np.asarray([0]), audio_start_times_missing_first),
                                        axis=0)
-    for start_time in audio_start_times:
-        audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
-                                                        audio_segment_length,
-                                       midi_segment_length, duration_song, sr)
 
     return audio_start_times, audio_segment_length, midi_segment_length
 
@@ -66,9 +72,8 @@ def silent_audio(sr, padding):
     return silent_audio_time_series
 
 def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi_segment_length,
-                                   duration_song, sr):
-    padding = midi_segment_length / 2
-
+                                   duration_song, sr, padding_portion=.5):
+    padding = midi_segment_length * padding_portion
     # If you don't want to pad the audio segments, comment out the following code and move the
     # block inside the else condition out of the else condition
     # print("start:", start)
@@ -137,7 +142,7 @@ def create_simplified_midi(midi_file):
                 print("CONTROL ALL NOTES OFF MESSAGE!")
 
     if count_ons != count_offs:
-        print('TROUBLE IN RIVER CITY. INEQUAL NUM ONS AND OFFS!!!')
+        print('TROUBLE IN RIVER CITY. INEQUAL NUM ONS AND OFFS (prior to simplified midi)')
         print("count ons:", count_ons)
         print("offs:", count_offs)
 
@@ -159,8 +164,8 @@ def create_simplified_midi(midi_file):
 
     return simplified_midi, ticks_since_start, length_in_secs_full_song
 
-def chop_simplified_midi(midi_file, midi_segment_length):
-    simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(midi_file)
+def chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times):
+
 
     #check for note ons and offs equal
     count_note_on = 0
@@ -196,13 +201,9 @@ def chop_simplified_midi(midi_file, midi_segment_length):
     for message in messages_to_erase:
         simplified_midi.remove(message)
 
-    midi_start_timestamps = np.arange(0, length_in_secs_full_song, midi_segment_length)
     time_so_far = 0
     midi_segments =[]
-    for midi_start_time in midi_start_timestamps:
-        #debugging
-        if midi_start_time == 665.0:
-            print("why is this bitch 17 seconds?")
+    for midi_start_time in midi_start_times:
         midi_segment = []
         for message in simplified_midi:
             end_time = time_so_far + midi_segment_length
@@ -210,7 +211,7 @@ def chop_simplified_midi(midi_file, midi_segment_length):
                 midi_segment.append(message)
         midi_segments.append([midi_start_time, midi_segment])
         time_so_far = end_time
-    return midi_segments, absolute_ticks_last_note, length_in_secs_full_song
+    return midi_segments, absolute_ticks_last_note
 
 def add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length):
     #Account for notes which start before a clip and end after a clip. For ex, a note which is
@@ -288,22 +289,49 @@ def done_beep():
     freq = 392  # Hz
     winsound.Beep(freq, duration)
 
-def preprocess_audio():
+def preprocess_audio_and_midi():
     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
     for audio_file in audio_files:
-        time_series_and_sr = load_audio(audio_file)
-        audio_start_times, audio_segment_length, midi_segment_length = timestamps_and_call_load_segment(audio_file, time_series_and_sr)
+        audio_decoded = load_audio(audio_file)
+        time_series, sr = audio_decoded
+        audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
+            audio_file, audio_decoded)
         midi_file = load_midi(audio_file)
 
         #See time differences
-        duration = librosa.core.get_duration(time_series_and_sr[0], time_series_and_sr[1])
+        duration_song = librosa.core.get_duration(time_series, sr)
         midi_len = midi_file.length
-        # if midi_len != duration:
-            # print(audio_file, "audio len - midi len:", duration-midi_len)
+        if midi_len != duration_song:
+            print(audio_file, "audio len - midi len:", duration_song-midi_len)
 
-        midi_segments, absolute_ticks_last_note, length_in_secs_full_song = chop_simplified_midi(
-            midi_file, midi_segment_length)
+        simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(
+            midi_file)
+        midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
+
+        print("len audio start timestamps:", len(audio_start_times))
+        print("len midi starts:", len(midi_start_times))
+        if len(audio_start_times) != len(midi_start_times):
+            if len(audio_start_times) > len(midi_start_times):
+                num_start_times = len(midi_start_times)
+                audio_start_times_shortened = audio_start_times[:num_start_times + 1]
+                audio_start_times = audio_start_times_shortened
+            else:
+                num_start_times = len(audio_start_times)
+                midi_start_times_shortened = midi_start_times[:num_start_times + 1]
+                midi_start_times = midi_start_times_shortened
+
+        for start_time in audio_start_times:
+            padding_portion = .5  # padding on each side of audio is midi_segment_length *
+            # padding portion
+            audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
+                                                                       audio_segment_length,
+                                                                       midi_segment_length,
+                                                                       duration_song, sr,
+                                                                       padding_portion)
+            # cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
+
+        midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
         midi_segments_plus_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
         midi_filename = midi_file.filename[35:-4]
@@ -312,7 +340,7 @@ def preprocess_audio():
     done_beep()
 
 def main():
-    preprocess_audio()
+    preprocess_audio_and_midi()
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -340,9 +368,10 @@ if __name__ == '__main__':
     #TODO: design and record first CNN architecture: I plan to try will be a keras Sequential model. As mentioned above, I will likely place a pooling layer after every one or two convolutional layers. The final layer will match the output dimensions.
     # TODO: compile and train the model.  experiment with multiple numbers of epochs.
     # TODO: test the benchmark and the model with the data reserved for testing and compare the two using the same evaluation metrics.
+    #TODO: Add condition to add notes off if song has MIDI Control change 123 (all notes off)
 
     # TODO:
-    # Parse through note-containing tracks (which are lists of messages)(DONE)
+    #
     #
 
 

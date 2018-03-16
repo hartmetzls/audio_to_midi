@@ -1,3 +1,4 @@
 {
-  "test_create_dataset.py::test_duration": true
+  "test_create_dataset.py::test_difference_between_audio_first_note_onset_and_midi_first_note_on": true,
+  "test_create_dataset.py::test_same_num_audio_and_midi_segments_created": true
 }
