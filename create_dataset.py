@@ -292,6 +292,8 @@ def done_beep():
 def preprocess_audio_and_midi():
     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
+    cqt_segments = [] #TODO: Is there a faster data structure here?
+    all_songs_midi_segments_including_onsets = []
     for audio_file in audio_files:
         audio_decoded = load_audio(audio_file)
         time_series, sr = audio_decoded
@@ -329,11 +331,17 @@ def preprocess_audio_and_midi():
                                                                        midi_segment_length,
                                                                        duration_song, sr,
                                                                        padding_portion)
-            # cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
+            cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
+            cqt_segments.append(cqt_of_segment)
 
         midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
         midi_segments_plus_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
+
+        # encode, then append. takes in midi start time and midi segment
+        # for midi_segment in midi_segments_plus_onsets:
+        #     all_songs_midi_segments_including_onsets.append(midi_segment)
+
         midi_filename = midi_file.filename[35:-4]
         reconstruct_midi(midi_filename, midi_segments_plus_onsets, absolute_ticks_last_note,
                          length_in_secs_full_song)

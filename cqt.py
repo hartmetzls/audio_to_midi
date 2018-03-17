@@ -1,4 +1,4 @@
-from create_dataset import find_audio_files, load_audio, create_simplified_midi, load_segment_of_audio_and_save
+
 import librosa
 import ntpath
 from mido import MidiFile
@@ -6,17 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def audio_segments_cqt(audio_segment_time_series, sr):
-    desired_cqt_length_minus_1 = 48
-    minimum_factor_cqt_hop_length = 64
-    x = int(audio_segment_time_series.shape[0]/(
-            minimum_factor_cqt_hop_length*desired_cqt_length_minus_1))
-    hop_length = minimum_factor_cqt_hop_length * x
-    C = librosa.cqt(audio_segment_time_series, sr=sr, hop_length=hop_length)
+    # desired_cqt_length_minus_2 = 48
+    # minimum_factor_cqt_hop_length = 64
+    # x = int(audio_segment_time_series.shape[0]/(
+    #         minimum_factor_cqt_hop_length*desired_cqt_length_minus_2))
+    # hop_length = minimum_factor_cqt_hop_length * x
+
+    #I believe fmin should be set to the Hz val of the lowest MIDI note number in the dataset
+    C = librosa.cqt(audio_segment_time_series, sr=sr, fmin=29.1, sparsity=.99)   #,
+    # hop_length=hop_length
     print("cqt:", C.shape)
-    if C.shape[1] != 49:
-        print("CQT incorrect length")
     return C
-    #Desired CQT length 49
+    #Desired CQT length 49 <-- idk why we said this before! <TODO
 
     # print(C)
     # print("Cqt real:", np.array(C, 'float32'))
