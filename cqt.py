@@ -15,7 +15,7 @@ def audio_segments_cqt(audio_segment_time_series, sr):
     #I believe fmin should be set to the Hz val of the lowest MIDI note number in the dataset
     C = librosa.cqt(audio_segment_time_series, sr=sr, fmin=29.1, sparsity=.99)   #,
     # hop_length=hop_length
-    print("cqt:", C.shape)
+    # print("cqt:", C.shape)
     return C
     #Desired CQT length 49 <-- idk why we said this before! <TODO
 

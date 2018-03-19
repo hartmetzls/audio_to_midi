@@ -294,6 +294,7 @@ def preprocess_audio_and_midi():
     audio_files = find_audio_files(directory_str_audio)
     cqt_segments = [] #TODO: Is there a faster data structure here?
     all_songs_midi_segments_including_onsets = []
+    midi_segments_count = 0
     for audio_file in audio_files:
         audio_decoded = load_audio(audio_file)
         time_series, sr = audio_decoded
@@ -338,6 +339,10 @@ def preprocess_audio_and_midi():
         midi_segments_plus_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
 
+        #debugging equal num cqt and midi segment
+        for midi_segment in midi_segments_plus_onsets:
+            midi_segments_count += 1
+
         # encode, then append. takes in midi start time and midi segment
         # for midi_segment in midi_segments_plus_onsets:
         #     all_songs_midi_segments_including_onsets.append(midi_segment)
@@ -345,6 +350,7 @@ def preprocess_audio_and_midi():
         midi_filename = midi_file.filename[35:-4]
         reconstruct_midi(midi_filename, midi_segments_plus_onsets, absolute_ticks_last_note,
                          length_in_secs_full_song)
+    print("num data points:", len(cqt_segments))
     done_beep()
 
 def main():
@@ -380,7 +386,8 @@ if __name__ == '__main__':
 
     # TODO:
     #
-    #
+    #“A quirk of the MIDI standard (and one that some older Yamaha models had trouble dealing with), is that the standard allows notes to be released by sending a note on message with a velocity value of 0, instead of using a note off message.”
+
 
 
 
