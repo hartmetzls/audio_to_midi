@@ -1,23 +1,21 @@
-import librosa
-from mido import MidiFile, Message, MidiTrack
-import numpy as np
-import ntpath
+from mido import Message, MidiTrack
 import time
 from collections import defaultdict
 
 #seaborn makes plots prettier
 import seaborn
-from cqt import *
-from collections import namedtuple
 
+from cqt import *
+from encode_midi_segments import *
+from decode_midi import *
+from collections import namedtuple
 # needed for jupyter notebook support
 seaborn.set(style='ticks')
+#audio playback widget
+# from IPython.display import Audio
 
 # Data Types
 AudioDecoded = namedtuple('AudioDecoded', ['time_series', 'sr'])
-
-#audio playback widget
-# from IPython.display import Audio
 
 #TODO: Advice to download with LAME N/A?
 def find_audio_files(directory_str_audio):
@@ -26,11 +24,8 @@ def find_audio_files(directory_str_audio):
     # listed twice
     return audio_files
 
-
-
 def load_audio(audio_file):
     time_series, sr = librosa.core.load(audio_file, sr=22050*4)
-
     time_series_and_sr = AudioDecoded(time_series, sr)
 
     # with open('filename.pickle', 'wb') as handle:
@@ -72,7 +67,9 @@ def silent_audio(sr, padding):
     return silent_audio_time_series
 
 def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi_segment_length,
-                                   duration_song, sr, padding_portion=.5):
+                                   duration_song, sr, padding_portion=.5): #setting padding in
+    # such as way makes it so that if a better temporally aligned dataset is used in the future,
+    # the code can segment without padding
     padding = midi_segment_length * padding_portion
     # If you don't want to pad the audio segments, comment out the following code and move the
     # block inside the else condition out of the else condition
@@ -83,14 +80,13 @@ def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi
                                                           duration=segment_duration, sr=sr)
         silence = silent_audio(sr, padding)
         audio_segment_time_series = np.concatenate((silence, audio_segment_time_series_og), axis=0)
-        # print("audio segment time series:", audio_segment_time_series)
-    elif (duration_song - start) < audio_segment_length:
+    elif (duration_song - start) < audio_segment_length: #if we're at the end of a song and need
+        # padding
         segment_duration = (duration_song - start)
         audio_segment_time_series_og, sr = librosa.core.load(audio_file, offset=start,
                                                           duration=segment_duration, sr=sr)
         audio_segment_time_series = np.concatenate(
             (audio_segment_time_series_og, silent_audio(sr, (audio_segment_length-segment_duration))),axis=0)
-
     else:
         audio_segment_time_series, sr = librosa.core.load(audio_file, offset=start,
                                                           duration=audio_segment_length, sr=sr)
@@ -105,7 +101,6 @@ def load_midi(audio_file):
     #Bach is type 1 MIDI, meaning all tracks start at the same time
     midi_str = "C:/Users/Lilly/audio_and_midi/midi/" + ntpath.basename(audio_file)[:-4] + ".mid"
     midi_file = MidiFile(midi_str)
-    # print("midi file:", midi_file)
     # last_message = midi_file.tracks[-1][-100:]
     return midi_file
 
@@ -114,7 +109,7 @@ def create_simplified_midi(midi_file):
     ticks_since_start = 0
     # print("midi file.tracks[-1]:", midi_file.tracks[-1])
 
-    # debugging: check for note offs without note ons
+    # debugging: check for note offs without note ons; check control changes in song
     print("midi file:", midi_file)
     count_ons = 0
     count_offs = 0
@@ -124,7 +119,7 @@ def create_simplified_midi(midi_file):
         if message.type == "set_tempo":
             tempo_in_microsecs_per_beat = message.tempo
     for message in midi_file.tracks[-1]:
-        # convert delta time to TICKS since start
+        # convert delta time (delta ticks) to TICKS since start
         ticks_since_start += message.time
         if message.type == "note_on" or message.type == "note_off":
             simplified_midi.append([message.type, message.note, ticks_since_start])
@@ -135,12 +130,13 @@ def create_simplified_midi(midi_file):
             else:
                 count_offs += 1
 
-        #debugging: figuring out if an all notes off message is the issue for all songs
+        #debugging: check control changes in song; check for 123
         if message.type == 'control_change':
             control_changes.append(message.control)
             if message.control == 123:
                 print("CONTROL ALL NOTES OFF MESSAGE!")
 
+    #debugging
     if count_ons != count_offs:
         print('TROUBLE IN RIVER CITY. INEQUAL NUM ONS AND OFFS (prior to simplified midi)')
         print("count ons:", count_ons)
@@ -166,8 +162,7 @@ def create_simplified_midi(midi_file):
 
 def chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times):
 
-
-    #check for note ons and offs equal
+    # debugging: check for note ons and offs equal
     count_note_on = 0
     count_note_off = 0
     for message in simplified_midi:
@@ -237,7 +232,10 @@ def add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
             count_off = on_off_counts_dict["note_off"]
             if count_on > count_off:
                 #This is inclusive of the "exclusive ending" (ie This will insert an end time of
-                # .5, when technically it should be just under .5)
+                # .5, when technically it should be just under .5) #TODO: Check that these note
+                # offs
+                # aren't getting left out in the encoding process. Rethink whether or not this
+                # will even matter
                 pitches_to_set_to_on_at_beginning_of_segment.append(pitch)
                 end_time = start_time + midi_segment_length
                 messages.append(["note_off", pitch, end_time])
@@ -246,13 +244,9 @@ def add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
 def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, length_in_secs_full_song):
     time_so_far = 0
     for midi_segment in midi_segments:
+
         # time in seconds to absolute ticks
         absolute_ticks_midi_segment = []
-
-        #debugging
-        start_time = midi_segment[0]
-        if start_time == 665.0:
-            notification  = ("17 SECOND LONG TRACK <-----------------")
         messages = midi_segment[1]
         for message in messages:
             note_on_or_off = message[0]
@@ -270,6 +264,7 @@ def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, len
             delta_time = int(time - time_so_far)
             delta_time_midi_segment.append([note_on_or_off, pitch, delta_time])
             time_so_far = time
+
         mid = MidiFile()
         track = MidiTrack()
         mid.tracks.append(track)
@@ -293,7 +288,7 @@ def preprocess_audio_and_midi():
     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
     cqt_segments = [] #TODO: Is there a faster data structure here?
-    all_songs_midi_segments_including_onsets = []
+    all_songs_encoded_midi_segments = []
     midi_segments_count = 0
     for audio_file in audio_files:
         audio_decoded = load_audio(audio_file)
@@ -302,8 +297,10 @@ def preprocess_audio_and_midi():
             audio_file, audio_decoded)
         midi_file = load_midi(audio_file)
 
-        #See time differences
+
         duration_song = librosa.core.get_duration(time_series, sr)
+
+        # See time differences
         midi_len = midi_file.length
         if midi_len != duration_song:
             print(audio_file, "audio len - midi len:", duration_song-midi_len)
@@ -312,16 +309,14 @@ def preprocess_audio_and_midi():
             midi_file)
         midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
 
-        print("len audio start timestamps:", len(audio_start_times))
-        print("len midi starts:", len(midi_start_times))
         if len(audio_start_times) != len(midi_start_times):
             if len(audio_start_times) > len(midi_start_times):
                 num_start_times = len(midi_start_times)
-                audio_start_times_shortened = audio_start_times[:num_start_times + 1]
+                audio_start_times_shortened = audio_start_times[:num_start_times]
                 audio_start_times = audio_start_times_shortened
             else:
                 num_start_times = len(audio_start_times)
-                midi_start_times_shortened = midi_start_times[:num_start_times + 1]
+                midi_start_times_shortened = midi_start_times[:num_start_times]
                 midi_start_times = midi_start_times_shortened
 
         for start_time in audio_start_times:
@@ -336,21 +331,29 @@ def preprocess_audio_and_midi():
             cqt_segments.append(cqt_of_segment)
 
         midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
-        midi_segments_plus_onsets = \
+        midi_start_times_and_segments_incl_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
 
-        #debugging equal num cqt and midi segment
-        for midi_segment in midi_segments_plus_onsets:
+        for midi_segment in midi_start_times_and_segments_incl_onsets:
+            midi_start_time = midi_segment[0]
+            messages = midi_segment[1]
+            encoded_segment = encode_midi_segment(midi_start_time, messages,
+                                                  midi_segment_length)
+            all_songs_encoded_midi_segments.append(encoded_segment) #TODO: testcorrect num
+
+            # debugging equal num cqt and midi segment
             midi_segments_count += 1
 
-        # encode, then append. takes in midi start time and midi segment
-        # for midi_segment in midi_segments_plus_onsets:
-        #     all_songs_midi_segments_including_onsets.append(midi_segment)
+        # pass example encoded midi for decode build
+        example_encoded_midi = all_songs_encoded_midi_segments[1]
+        decoded_midi = decode_midi_segment(example_encoded_midi, midi_segment_length, 6, 21,
+                                           107, (107-21+1))
 
         midi_filename = midi_file.filename[35:-4]
-        reconstruct_midi(midi_filename, midi_segments_plus_onsets, absolute_ticks_last_note,
+        reconstruct_midi(midi_filename, midi_start_times_and_segments_incl_onsets, absolute_ticks_last_note,
                          length_in_secs_full_song)
     print("num data points:", len(cqt_segments))
+    print("midi segments count:", midi_segments_count)
     done_beep()
 
 def main():
@@ -362,13 +365,6 @@ if __name__ == '__main__':
     print("--- %s seconds ---" % (time.time() - start_time))
 
     # "lazy loading" with pickle (lazy in gen. means you don't run it until you need it)
-    # TODO: Check that you're creating the same num of audio and MIDI: ~71 extra audio files are
-    # created
-    # TODO: Check if there are any midi files for which there are no audio files
-    # TODO: CQT audio
-    # TODO: one hot encode midi
-    # TODO: Resubmit proposal
-    # TODO: Define benchmark
 
     # TODO:
     # Preprocessing audio

@@ -9,33 +9,38 @@ def encode_midi_segment(midi_start_time, midi_segment, midi_segment_length):
     highest = 107
     num_notes = highest - lowest + 1
     num_discrete_time_values = 6
-    encoded_segment_shape = np.zeros(shape=(num_notes, num_discrete_time_values))
+    #instantiate shape
+    encoded_segment = np.zeros(shape=(num_notes, num_discrete_time_values))
     # for note in range(lowest, highest + 1):
-    #     encoded_segment_shape[note]=[]
+    #     encoded_segment[note]=[]
     for message in midi_segment:
         time = message[-1]
         time_scaled = time - midi_start_time
+        bucket_length = midi_segment_length / num_discrete_time_values
         pitch = message[1]
         pitch_scaled = pitch - lowest
-        bucket_length = midi_segment_length/num_discrete_time_values
         on_or_off = message[0]
         if on_or_off == 'note_on':
             array_value = 1
-        if on_or_off == 'note_off':
+        else:
             array_value = 0
         bucket_count = 0
-        added = 0
-        while added == 0:
-            for next_bucket_start_time in np.arange(bucket_length, midi_segment_length, bucket_length):
-                if time_scaled < next_bucket_start_time:
-                    encoded_segment_shape[pitch_scaled, bucket_count] = array_value
-                    added += 1
-                else:
-                    bucket_count += 1
-    print(encoded_segment_shape)
+        for next_bucket_start_time in np.arange(bucket_length, midi_segment_length, bucket_length):
+            if time_scaled < next_bucket_start_time:
+                encoded_segment[pitch_scaled, bucket_count] = array_value
+
+            #TODO: Notes which are shorter than .08, and don't happen to cross a bucket end time line, are completely left out. Should the solution be to represent them as longer than they should be OR leave them out completely? Maybe this decision can be based on how long, for ex, leave out notes shorter than .04 and leave in those longer than .04
+
+            #this condition is here for 'note off's which were added in in the course of ensuring a note off for every note on.
+            elif time_scaled == midi_segment_length:
+                last_bucket = num_discrete_time_values - 1
+                encoded_segment[pitch_scaled, last_bucket] = array_value
+            bucket_count += 1
+    return encoded_segment
 
 def main():
-    encode_midi_segment(2.0, [['note_on', 64, 2.3]], 0.5)
+    #exploratory exampled
+    encode_midi_segment(2.0, [['note_on', 64, 2.3], ['note_off', 64, 2.49]], 0.5)
 
 if __name__ == '__main__':
     main()
