@@ -241,6 +241,17 @@ def add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
                 messages.append(["note_off", pitch, end_time])
     return midi_segments
 
+def find_lowest_and_highest_midi_note_numbers(simplified_midi):
+    lowest_note_number_so_far = 127
+    highest_note_number_so_far = 0
+    for message in simplified_midi:
+        note_number = message[1]
+        if note_number < lowest_note_number_so_far:
+            lowest_note_number_so_far = note_number
+        if note_number > highest_note_number_so_far:
+            highest_note_number_so_far = note_number
+    return lowest_note_number_so_far, highest_note_number_so_far
+
 def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, length_in_secs_full_song):
     time_so_far = 0
     for midi_segment in midi_segments:
@@ -287,7 +298,7 @@ def done_beep():
 def preprocess_audio_and_midi():
     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
-    cqt_segments = [] #TODO: Is there a faster data structure here?
+    cqt_segments = []
     all_songs_encoded_midi_segments = []
     midi_segments_count = 0
     for audio_file in audio_files:
@@ -296,7 +307,6 @@ def preprocess_audio_and_midi():
         audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
             audio_file, audio_decoded)
         midi_file = load_midi(audio_file)
-
 
         duration_song = librosa.core.get_duration(time_series, sr)
 
@@ -307,6 +317,9 @@ def preprocess_audio_and_midi():
 
         simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(
             midi_file)
+
+        lowest_midi_note, highest_midi_note = find_lowest_and_highest_midi_note_numbers(simplified_midi)
+
         midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
 
         if len(audio_start_times) != len(midi_start_times):
@@ -338,7 +351,7 @@ def preprocess_audio_and_midi():
             midi_start_time = midi_segment[0]
             messages = midi_segment[1]
             encoded_segment = encode_midi_segment(midi_start_time, messages,
-                                                  midi_segment_length)
+                                                  midi_segment_length, lowest_midi_note, highest_midi_note)
             all_songs_encoded_midi_segments.append(encoded_segment) #TODO: testcorrect num
 
             # debugging equal num cqt and midi segment
