@@ -8,6 +8,8 @@ import seaborn
 from cqt import *
 from encode_midi_segments import *
 from decode_midi import *
+from benchmark import *
+
 from collections import namedtuple
 # needed for jupyter notebook support
 seaborn.set(style='ticks')
@@ -66,8 +68,7 @@ def silent_audio(sr, padding):
     # librosa.output.write_wav("C:/Users/Lilly/audio_and_midi/out_int16.wav", silent_audio_time_series, sr)
     return silent_audio_time_series
 
-def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi_segment_length,
-                                   duration_song, sr, padding_portion=.5): #setting padding in
+def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi_segment_length, duration_song, sr, padding_portion=.5): #setting padding in
     # such as way makes it so that if a better temporally aligned dataset is used in the future,
     # the code can segment without padding
     padding = midi_segment_length * padding_portion
@@ -93,8 +94,8 @@ def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi
     filename_format = "C:/Users/Lilly/audio_and_midi/segments/audio/{0}_start_time_{1}.wav"
     filename = filename_format.format(ntpath.basename(audio_file)[:-4], str(start))
     librosa.output.write_wav(filename, audio_segment_time_series, sr)
-    # print("end time:", (audio_segment_length + start))
-    # print("shape data point:", audio_segment_time_series.shape)
+    #visualization
+    # Audio(audio_segment_time_series, rate=sr)
     return audio_segment_time_series
 
 def load_midi(audio_file):
@@ -258,14 +259,15 @@ def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, len
 
         # time in seconds to absolute ticks
         absolute_ticks_midi_segment = []
+        start_time = midi_segment[0]
         messages = midi_segment[1]
         for message in messages:
             note_on_or_off = message[0]
             pitch = message[1]
-            time = message[-1]
-            absolute_ticks_midi_segment.append([note_on_or_off, pitch, time *
-                                                absolute_ticks_last_note /
-                                                length_in_secs_full_song])
+            scaled_time = message[-1]
+            time = scaled_time + start_time
+            absolute_ticks = time * absolute_ticks_last_note / length_in_secs_full_song
+            absolute_ticks_midi_segment.append([note_on_or_off, pitch, absolute_ticks])
         # time in absolute ticks to delta time
         delta_time_midi_segment = []
         for message in absolute_ticks_midi_segment:
@@ -281,8 +283,18 @@ def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, len
         mid.tracks.append(track)
         for message in delta_time_midi_segment:
             note_on_or_off = message[0]
-            pitch = message[1]
-            track.append(Message(note_on_or_off, note=pitch, time=message[-1]))
+            pitch = int(message[1])
+            delta_ticks = message[-1]
+
+            #debugging
+            if type(pitch) != int:
+                print("ah")
+            if pitch < 0 or pitch >127:
+                print("ptich num issues")
+            if type(delta_ticks) != int or delta_ticks < 0:
+                print("time issue")
+
+            track.append(Message(note_on_or_off, note=pitch, time=delta_ticks))
         str_start_time = str(midi_segment[0])
         filename_format = "C:/Users/Lilly/audio_and_midi/segments/midi/{0}_start_time_{1}.mid"
         filename = filename_format.format(midi_filename, str_start_time)
@@ -350,21 +362,30 @@ def preprocess_audio_and_midi():
         for midi_segment in midi_start_times_and_segments_incl_onsets:
             midi_start_time = midi_segment[0]
             messages = midi_segment[1]
-            encoded_segment = encode_midi_segment(midi_start_time, messages,
-                                                  midi_segment_length, lowest_midi_note, highest_midi_note)
+            encoded_segment, num_discrete_time_values, num_notes = encode_midi_segment(midi_start_time, messages, midi_segment_length, lowest_midi_note, highest_midi_note)
             all_songs_encoded_midi_segments.append(encoded_segment) #TODO: testcorrect num
 
             # debugging equal num cqt and midi segment
             midi_segments_count += 1
 
-        # pass example encoded midi for decode build
-        example_encoded_midi = all_songs_encoded_midi_segments[1]
-        decoded_midi = decode_midi_segment(example_encoded_midi, midi_segment_length, 6, 21,
-                                           107, (107-21+1))
+        #here for testing
+        # encoded_segment = all_songs_encoded_midi_segments[1]
+        decoded_segments = []
+        for encoded_segment in all_songs_encoded_midi_segments:
+            decoded_midi = decode_midi_segment(encoded_segment, midi_segment_length, num_discrete_time_values, lowest_midi_note)
+            decoded_segments.append(decoded_midi)
+        decoded_midi_start_times_and_segments = []
+        for i in range(len(midi_start_times)):
+            decoded_midi_start_times_and_segments.append([midi_start_times[i], decoded_segments[i]])
 
         midi_filename = midi_file.filename[35:-4]
-        reconstruct_midi(midi_filename, midi_start_times_and_segments_incl_onsets, absolute_ticks_last_note,
-                         length_in_secs_full_song)
+        reconstruct_midi(midi_filename, decoded_midi_start_times_and_segments, absolute_ticks_last_note, length_in_secs_full_song)
+
+    for cqt_segment in cqt_segments:
+        index = cqt_segments.index(cqt_segment)
+        random_segment = benchmark(decoded_midi_start_times_and_segments, index)
+        return
+
     print("num data points:", len(cqt_segments))
     print("midi segments count:", midi_segments_count)
     done_beep()
