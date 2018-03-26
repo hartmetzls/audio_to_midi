@@ -1,8 +1,8 @@
 import numpy as np
 
 def encode_midi_segment(midi_start_time, midi_segment, midi_segment_length, lowest, highest):
-    lowest = 21
-    highest = 107
+    lowest = 21 #value for the entire dataset
+    highest = 107 #value for the entire dataset
     num_notes = highest - lowest + 1
     num_discrete_time_values = 6
     #instantiate shape
@@ -45,7 +45,7 @@ def encode_midi_segment(midi_start_time, midi_segment, midi_segment_length, lowe
                 encoded_segment[pitch_scaled, bin:] = 0
             # on.remove(pitch)
 
-    return encoded_segment
+    return encoded_segment, num_discrete_time_values, num_notes
 
     #         #TODO: Notes which are shorter than .08, and don't happen to cross a bucket end time line, are completely left out. Should the solution be to represent them as longer than they should be OR leave them out completely? Maybe this decision can be based on how long, for ex, leave out notes shorter than .04 and leave in those longer than .04. ANSWER: Every note present in the segment should be represented in at least one bucket.
     #         # For

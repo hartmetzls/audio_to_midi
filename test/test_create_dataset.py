@@ -94,38 +94,61 @@ from create_dataset import *
 #     audio_files = librosa.util.find_files(directory_str_audio, recurse=False, case_sensitive=True)
 #     assert len(audio_files) == len(set(audio_files)), "there are duplicates"
 
-# def test_note_off_for_every_note_on():
-#     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
-#     audio_files = find_audio_files(directory_str_audio)
-#     for audio_file in audio_files:
-#         time_series_and_sr = load_audio(audio_file)
-#         audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
-#             audio_file, time_series_and_sr)
-#         midi_file = load_midi(audio_file)
-#
-#         # See time differences
-#         duration = librosa.core.get_duration(time_series_and_sr[0], time_series_and_sr[1])
-#         midi_len = midi_file.length
-#         # if midi_len != duration:
-#         # print(audio_file, "audio len - midi len:", duration-midi_len)
-#
-#         midi_segments, absolute_ticks_last_note, length_in_secs_full_song = chop_simplified_midi(
-#             midi_file, midi_segment_length)
-#         midi_segments_plus_onsets = \
-#             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
-#         for start_time_and_messages in midi_segments_plus_onsets:
-#             messages = start_time_and_messages[1]
-#             for pitch in range(0,128):
-#                 count_note_on = 0
-#                 count_note_off = 0
-#                 for message in messages:
-#                     message_type = message[0]
-#                     message_pitch = message[1]
-#                     if message_type == 'note_on' and message_pitch == pitch:
-#                         count_note_on += 1
-#                     if message_type == 'note_off' and message_pitch == pitch:
-#                         count_note_off += 1
-#                 assert count_note_on == count_note_off, "inequal num ons and offs"
+def test_note_off_for_every_note_on():
+    directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+    audio_files = find_audio_files(directory_str_audio)
+    cqt_segments = [] #TODO: Is there a faster data structure here?
+    all_songs_encoded_midi_segments = []
+    midi_segments_count = 0
+    for audio_file in audio_files:
+        audio_decoded = load_audio(audio_file)
+        time_series, sr = audio_decoded
+        audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
+            audio_file, audio_decoded)
+        midi_file = load_midi(audio_file)
+        duration_song = librosa.core.get_duration(time_series, sr)
+        simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(
+            midi_file)
+        midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
+
+        if len(audio_start_times) != len(midi_start_times):
+            if len(audio_start_times) > len(midi_start_times):
+                num_start_times = len(midi_start_times)
+                audio_start_times_shortened = audio_start_times[:num_start_times]
+                audio_start_times = audio_start_times_shortened
+            else:
+                num_start_times = len(audio_start_times)
+                midi_start_times_shortened = midi_start_times[:num_start_times]
+                midi_start_times = midi_start_times_shortened
+
+        for start_time in audio_start_times:
+            padding_portion = .5  # padding on each side of audio is midi_segment_length *
+            # padding portion
+            audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
+                                                                       audio_segment_length,
+                                                                       midi_segment_length,
+                                                                       duration_song, sr,
+                                                                       padding_portion)
+            cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
+            cqt_segments.append(cqt_of_segment)
+
+        midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
+        midi_start_times_and_segments_incl_onsets = \
+            add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
+
+        for start_time_and_messages in midi_start_times_and_segments_incl_onsets:
+            messages = start_time_and_messages[1]
+            for pitch in range(0,128):
+                count_note_on = 0
+                count_note_off = 0
+                for message in messages:
+                    message_type = message[0]
+                    message_pitch = message[1]
+                    if message_type == 'note_on' and message_pitch == pitch:
+                        count_note_on += 1
+                    if message_type == 'note_off' and message_pitch == pitch:
+                        count_note_off += 1
+                assert count_note_on == count_note_off, "inequal num ons and offs"
 
 # def test_no_midi_too_long():
 #     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
@@ -157,50 +180,50 @@ from create_dataset import *
 #                                                                       "created"
 #                 #TODO: Check that this is still true after the MIDI is reconstructed
 
-def test_cqts_all_same_shape():
-    directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
-    audio_files = find_audio_files(directory_str_audio)
-    cqt_segments = [] #TODO: Is there a faster data structure here?
-    for audio_file in audio_files:
-        audio_decoded = load_audio(audio_file)
-        time_series, sr = audio_decoded
-        audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
-            audio_file, audio_decoded)
-        midi_file = load_midi(audio_file)
-
-        #See time differences
-        duration_song = librosa.core.get_duration(time_series, sr)
-        midi_len = midi_file.length
-        if midi_len != duration_song:
-            print(audio_file, "audio len - midi len:", duration_song-midi_len)
-
-        simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(
-            midi_file)
-        midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
-
-        print("len audio start timestamps:", len(audio_start_times))
-        print("len midi starts:", len(midi_start_times))
-        if len(audio_start_times) != len(midi_start_times):
-            if len(audio_start_times) > len(midi_start_times):
-                num_start_times = len(midi_start_times)
-                audio_start_times_shortened = audio_start_times[:num_start_times + 1]
-                audio_start_times = audio_start_times_shortened
-            else:
-                num_start_times = len(audio_start_times)
-                midi_start_times_shortened = midi_start_times[:num_start_times + 1]
-                midi_start_times = midi_start_times_shortened
-
-        for start_time in audio_start_times:
-            padding_portion = .5  # padding on each side of audio is midi_segment_length *
-            # padding portion
-            audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
-                                                                       audio_segment_length,
-                                                                       midi_segment_length,
-                                                                       duration_song, sr,
-                                                                       padding_portion)
-            cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
-            cqt_segments.append(cqt_of_segment)
-    first_cqt_segment = cqt_segments[0]
-    cqt_shape = first_cqt_segment.shape
-    for segment in cqt_segments:
-        assert cqt_shape == segment.shape, "CQTs of audio segments are not all the same shape!!"
+# def test_cqts_all_same_shape():
+#     directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+#     audio_files = find_audio_files(directory_str_audio)
+#     cqt_segments = [] #TODO: Is there a faster data structure here?
+#     for audio_file in audio_files:
+#         audio_decoded = load_audio(audio_file)
+#         time_series, sr = audio_decoded
+#         audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
+#             audio_file, audio_decoded)
+#         midi_file = load_midi(audio_file)
+#
+#         #See time differences
+#         duration_song = librosa.core.get_duration(time_series, sr)
+#         midi_len = midi_file.length
+#         if midi_len != duration_song:
+#             print(audio_file, "audio len - midi len:", duration_song-midi_len)
+#
+#         simplified_midi, absolute_ticks_last_note, length_in_secs_full_song = create_simplified_midi(
+#             midi_file)
+#         midi_start_times = np.arange(0, length_in_secs_full_song, midi_segment_length)
+#
+#         print("len audio start timestamps:", len(audio_start_times))
+#         print("len midi starts:", len(midi_start_times))
+#         if len(audio_start_times) != len(midi_start_times):
+#             if len(audio_start_times) > len(midi_start_times):
+#                 num_start_times = len(midi_start_times)
+#                 audio_start_times_shortened = audio_start_times[:num_start_times + 1]
+#                 audio_start_times = audio_start_times_shortened
+#             else:
+#                 num_start_times = len(audio_start_times)
+#                 midi_start_times_shortened = midi_start_times[:num_start_times + 1]
+#                 midi_start_times = midi_start_times_shortened
+#
+#         for start_time in audio_start_times:
+#             padding_portion = .5  # padding on each side of audio is midi_segment_length *
+#             # padding portion
+#             audio_segment_time_series = load_segment_of_audio_and_save(audio_file, start_time,
+#                                                                        audio_segment_length,
+#                                                                        midi_segment_length,
+#                                                                        duration_song, sr,
+#                                                                        padding_portion)
+#             cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
+#             cqt_segments.append(cqt_of_segment)
+#     first_cqt_segment = cqt_segments[0]
+#     cqt_shape = first_cqt_segment.shape
+#     for segment in cqt_segments:
+#         assert cqt_shape == segment.shape, "CQTs of audio segments are not all the same shape!!"
