@@ -3,7 +3,7 @@ import time
 from collections import defaultdict
 
 #seaborn makes plots prettier
-import seaborn
+# import seaborn
 
 from cqt import *
 from encode_midi_segments import *
@@ -12,7 +12,7 @@ from benchmark import *
 
 from collections import namedtuple
 # needed for jupyter notebook support
-seaborn.set(style='ticks')
+# seaborn.set(style='ticks')
 #audio playback widget
 # from IPython.display import Audio
 
@@ -29,12 +29,6 @@ def find_audio_files(directory_str_audio):
 def load_audio(audio_file):
     time_series, sr = librosa.core.load(audio_file, sr=22050*4)
     time_series_and_sr = AudioDecoded(time_series, sr)
-
-    # with open('filename.pickle', 'wb') as handle:
-    #     pickle.dump(time_serieses_and_srs, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    # with open('filename.pickle', 'rb') as handle:
-    #     unserialized_data = pickle.load(handle)
-
     return time_series_and_sr
 
 #if they're the exact same length and at all out of seguence, nn will never be able to get edges
@@ -308,7 +302,10 @@ def done_beep():
     winsound.Beep(freq, duration)
 
 def preprocess_audio_and_midi():
-    directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+    #Windows
+    # directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
+    #Ubuntu (Linux)
+    directory_str_audio = "/home/lilly/Downloads/audio_midi/audio"
     audio_files = find_audio_files(directory_str_audio)
     cqt_segments = []
     all_songs_encoded_midi_segments = []
@@ -355,6 +352,11 @@ def preprocess_audio_and_midi():
             cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
             cqt_segments.append(cqt_of_segment)
 
+        #pickle time!
+        with open('cqt_segments.pkl', 'wb') as f:
+            pickle.dump(cqt_segments, f)
+        done_beep()
+
         midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
         midi_start_times_and_segments_incl_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
@@ -363,28 +365,30 @@ def preprocess_audio_and_midi():
             midi_start_time = midi_segment[0]
             messages = midi_segment[1]
             encoded_segment, num_discrete_time_values, num_notes = encode_midi_segment(midi_start_time, messages, midi_segment_length, lowest_midi_note, highest_midi_note)
-            all_songs_encoded_midi_segments.append(encoded_segment) #TODO: testcorrect num
+            all_songs_encoded_midi_segments.append(encoded_segment)
 
             # debugging equal num cqt and midi segment
             midi_segments_count += 1
 
-        #here for testing
-        # encoded_segment = all_songs_encoded_midi_segments[1]
-        decoded_segments = []
-        for encoded_segment in all_songs_encoded_midi_segments:
-            decoded_midi = decode_midi_segment(encoded_segment, midi_segment_length, num_discrete_time_values, lowest_midi_note)
-            decoded_segments.append(decoded_midi)
-        decoded_midi_start_times_and_segments = []
-        for i in range(len(midi_start_times)):
-            decoded_midi_start_times_and_segments.append([midi_start_times[i], decoded_segments[i]])
+        # #here for testing
+        # # encoded_segment = all_songs_encoded_midi_segments[1]
+        # decoded_segments = []
+        # for encoded_segment in all_songs_encoded_midi_segments:
+        #     decoded_midi = decode_midi_segment(encoded_segment, midi_segment_length, num_discrete_time_values, lowest_midi_note)
+        #     decoded_segments.append(decoded_midi)
+        # decoded_midi_start_times_and_segments = []
+        # for i in range(len(midi_start_times)):
+        #     decoded_midi_start_times_and_segments.append([midi_start_times[i], decoded_segments[i]])
 
-        midi_filename = midi_file.filename[35:-4]
-        reconstruct_midi(midi_filename, decoded_midi_start_times_and_segments, absolute_ticks_last_note, length_in_secs_full_song)
+        # code for midi reconstruction (for purposes of listening)
+        # midi_filename = midi_file.filename[35:-4]
+        # reconstruct_midi(midi_filename, decoded_midi_start_times_and_segments, absolute_ticks_last_note, length_in_secs_full_song)
 
-    for cqt_segment in cqt_segments:
-        index = cqt_segments.index(cqt_segment)
-        random_segment = benchmark(decoded_midi_start_times_and_segments, index)
-        return
+    #benchmark
+    # for cqt_segment in cqt_segments:
+    #     index = cqt_segments.index(cqt_segment)
+    #     random_segment = benchmark(decoded_midi_start_times_and_segments, index)
+    #     return
 
     print("num data points:", len(cqt_segments))
     print("midi segments count:", midi_segments_count)
@@ -419,5 +423,19 @@ if __name__ == '__main__':
     #“A quirk of the MIDI standard (and one that some older Yamaha models had trouble dealing with), is that the standard allows notes to be released by sending a note on message with a velocity value of 0, instead of using a note off message.”
 
 
+def create_feature_sets_and_labels(cqt_segments, encoded_midi_segments, test_size=.13, validation_size=.12):
+    #set up like [cqt segment, encoded midi segment] ?
+    # then shuffle?
+    num_datapoints = len(cqt_segments)
+    testing_size = int(test_size*num_datapoints)
+    validation_size = int(validation_size*num_datapoints)
+    training_size = num_datapoints - testing_size - validation_size
+
+    # in dog breeds project, train_valid_test_ files were nupy arrays containing file paths to images
+
+    import random
+    random.seed(262656)
+    random.shuffle(cqt_segments)
+    random.shuffle(encoded_midi_segments)
 
 
