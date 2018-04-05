@@ -23,13 +23,13 @@ def audio_segments_cqt(audio_segment_time_series, sr):
     #  start reading it
 
     #visualize cqt
-    CQT = librosa.amplitude_to_db(C, ref=np.max)
-    # stft = librosa.core.stft(time_series_and_sr[0])
-    # print("stft:", stft.shape)
-    librosa.display.specshow(CQT, y_axis='cqt_note')
-    plt.colorbar(format='%+2.0f dB')
-    plt.show()
-    return C
+    # CQT = librosa.amplitude_to_db(C, ref=np.max)
+    # # stft = librosa.core.stft(time_series_and_sr[0])
+    # # print("stft:", stft.shape)
+    # librosa.display.specshow(CQT, y_axis='cqt_note')
+    # plt.colorbar(format='%+2.0f dB')
+    # plt.show()
+    # return C
 
 def main():
     # compare_beats("C:/Users/Lilly/audio_and_midi/audio/Bach_BWV871-02_002_20090916-SMD.wav")

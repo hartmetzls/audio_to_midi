@@ -8,7 +8,6 @@ from collections import defaultdict
 from cqt import *
 from encode_midi_segments import *
 from decode_midi import *
-from benchmark import *
 
 from collections import namedtuple
 # needed for jupyter notebook support
@@ -16,11 +15,16 @@ from collections import namedtuple
 #audio playback widget
 # from IPython.display import Audio
 
+import pickle
+import random #TODO: This is just a python random seed. np, tensorflow and keras all have their own random functions
+random.seed(262656)
+
 # Data Types
 AudioDecoded = namedtuple('AudioDecoded', ['time_series', 'sr'])
 
 #TODO: Advice to download with LAME N/A?
-def find_audio_files(directory_str_audio):
+def find_audio_files(directory_str):
+    directory_str_audio = directory_str + "audio"
     audio_files = librosa.util.find_files(directory_str_audio, recurse=False, case_sensitive=True) #recurse False
     # means subfolders are not searched; case_sensitive True ultimately keeps songs from being
     # listed twice
@@ -87,14 +91,17 @@ def load_segment_of_audio_and_save(audio_file, start, audio_segment_length, midi
                                                           duration=audio_segment_length, sr=sr)
     filename_format = "C:/Users/Lilly/audio_and_midi/segments/audio/{0}_start_time_{1}.wav"
     filename = filename_format.format(ntpath.basename(audio_file)[:-4], str(start))
-    librosa.output.write_wav(filename, audio_segment_time_series, sr)
-    #visualization
+
+    # #for testing by listening to audio, currently written for windows
+    # librosa.output.write_wav(filename, audio_segment_time_series, sr)
+    # #visualization
     # Audio(audio_segment_time_series, rate=sr)
     return audio_segment_time_series
 
-def load_midi(audio_file):
+def load_midi(directory_str, audio_file):
     #Bach is type 1 MIDI, meaning all tracks start at the same time
-    midi_str = "C:/Users/Lilly/audio_and_midi/midi/" + ntpath.basename(audio_file)[:-4] + ".mid"
+    midi_base_str = directory_str + "midi/"
+    midi_str = midi_base_str + ntpath.basename(audio_file)[:-4] + ".mid"
     midi_file = MidiFile(midi_str)
     # last_message = midi_file.tracks[-1][-100:]
     return midi_file
@@ -295,18 +302,27 @@ def reconstruct_midi(midi_filename, midi_segments, absolute_ticks_last_note, len
         mid.save(filename)
     return
 
+# #done beep for windows
+# def done_beep():
+#     import winsound
+#     duration = 1500  # millisecond
+#     freq = 392  # Hz
+#     winsound.Beep(freq, duration)
+
+#done beep for linux
 def done_beep():
-    import winsound
-    duration = 1500  # millisecond
-    freq = 392  # Hz
-    winsound.Beep(freq, duration)
+    import os
+    duration = 1  # second
+    freq = random.randint(220, 660)
+    # freq = 440  # Hz
+    os.system('play --no-show-progress --null --channels 1 synth %s sine %f' % (duration, freq))
 
 def preprocess_audio_and_midi():
     #Windows
     # directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
     #Ubuntu (Linux)
-    directory_str_audio = "/home/lilly/Downloads/audio_midi/audio"
-    audio_files = find_audio_files(directory_str_audio)
+    directory_str = "/home/lilly/Downloads/audio_midi/"
+    audio_files = find_audio_files(directory_str)
     cqt_segments = []
     all_songs_encoded_midi_segments = []
     midi_segments_count = 0
@@ -315,7 +331,7 @@ def preprocess_audio_and_midi():
         time_series, sr = audio_decoded
         audio_start_times, audio_segment_length, midi_segment_length = audio_timestamps(
             audio_file, audio_decoded)
-        midi_file = load_midi(audio_file)
+        midi_file = load_midi(directory_str, audio_file)
 
         duration_song = librosa.core.get_duration(time_series, sr)
 
@@ -352,11 +368,6 @@ def preprocess_audio_and_midi():
             cqt_of_segment = audio_segments_cqt(audio_segment_time_series, sr)
             cqt_segments.append(cqt_of_segment)
 
-        #pickle time!
-        with open('cqt_segments.pkl', 'wb') as f:
-            pickle.dump(cqt_segments, f)
-        done_beep()
-
         midi_segments, absolute_ticks_last_note = chop_simplified_midi(midi_file, midi_segment_length, simplified_midi, absolute_ticks_last_note, midi_start_times)
         midi_start_times_and_segments_incl_onsets = \
             add_note_onsets_to_beginning_when_needed(midi_segments, midi_segment_length)
@@ -384,15 +395,16 @@ def preprocess_audio_and_midi():
         # midi_filename = midi_file.filename[35:-4]
         # reconstruct_midi(midi_filename, decoded_midi_start_times_and_segments, absolute_ticks_last_note, length_in_secs_full_song)
 
-    #benchmark
-    # for cqt_segment in cqt_segments:
-    #     index = cqt_segments.index(cqt_segment)
-    #     random_segment = benchmark(decoded_midi_start_times_and_segments, index)
-    #     return
+
+    # pickle time!
+    with open('cqt_segments_midi_segments.pkl', 'wb') as handle:
+        pickle.dump(cqt_segments, handle)
+        pickle.dump(all_songs_encoded_midi_segments, handle)
 
     print("num data points:", len(cqt_segments))
     print("midi segments count:", midi_segments_count)
-    done_beep()
+
+    return
 
 def main():
     preprocess_audio_and_midi()
@@ -404,7 +416,7 @@ if __name__ == '__main__':
 
     # "lazy loading" with pickle (lazy in gen. means you don't run it until you need it)
 
-    # TODO:
+    # TODO: Rerun everything at some point in order to test project structure/pickle if not pickled
     # Preprocessing audio
     # Audio input encoding to NN (3->1)?
     # Midi encoding to NN (one-hot encode the MIDI output)
@@ -423,19 +435,6 @@ if __name__ == '__main__':
     #“A quirk of the MIDI standard (and one that some older Yamaha models had trouble dealing with), is that the standard allows notes to be released by sending a note on message with a velocity value of 0, instead of using a note off message.”
 
 
-def create_feature_sets_and_labels(cqt_segments, encoded_midi_segments, test_size=.13, validation_size=.12):
-    #set up like [cqt segment, encoded midi segment] ?
-    # then shuffle?
-    num_datapoints = len(cqt_segments)
-    testing_size = int(test_size*num_datapoints)
-    validation_size = int(validation_size*num_datapoints)
-    training_size = num_datapoints - testing_size - validation_size
 
-    # in dog breeds project, train_valid_test_ files were nupy arrays containing file paths to images
-
-    import random
-    random.seed(262656)
-    random.shuffle(cqt_segments)
-    random.shuffle(encoded_midi_segments)
 
 

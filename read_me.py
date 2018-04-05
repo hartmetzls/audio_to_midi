@@ -9,7 +9,7 @@ mkdir midi
 
 wget "http://resources.mpi-inf.mpg.de/SMD/SMD_MIDI-Audio-Piano-Music.html" -e robots=off -r -l1 -nd --no-parent -A.mid
 
-install necessary packages to tensorflow enviro:
+install necessary packages to env/virtualenv containing tensorflow:
 source activate tensorflow
 pip install mido
 pip install librosa
@@ -26,3 +26,9 @@ It worked.
 
 On linux you can instead do:
 sudo apt-get install libav-tools
+
+tensorflow
+
+#dependency for keras
+conda install h5py
+pip install keras
