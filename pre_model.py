@@ -1,16 +1,22 @@
 from create_dataset import preprocess_audio_and_midi
 import pickle
 from sklearn.model_selection import train_test_split
+import os
 
 def pickle_if_not_pickled():
     try:
         with open('cqt_segments_midi_segments.pkl', 'rb') as handle:
-            # pickle.load(handle)
-            # cqt_segments, midi_segments = pickle.load(handle)
-        # this instead if above code is buggy
-    except (OSError, IOError) as handle:
-        preprocess_audio_and_midi()
-        pickle_if_not_pickled() #TODO: Ask lou if this is an acceptable way for this function to be set up
+            cqt_segments = pickle.load(handle)
+            midi_segments = pickle.load(handle)
+    except (OSError, IOError) as err:
+        # Windows
+        if os.name == 'nt':
+            directory_str = "C:/Users/Lilly/audio_and_midi/"
+        # Linux
+        if os.name == 'posix':
+            directory_str = "/home/lilly/Downloads/audio_midi/"
+        preprocess_audio_and_midi(directory_str)
+        cqt_segments, midi_segments = pickle_if_not_pickled()
     return cqt_segments, midi_segments
 
 def create_feature_sets_and_labels(cqt_segments, midi_segments): #TODO: Validation set as well?

@@ -16,7 +16,9 @@ from collections import namedtuple
 # from IPython.display import Audio
 
 import pickle
-import random #TODO: This is just a python random seed. np, tensorflow and keras all have their own random functions
+import random #TODO: This is just a python random seed. need np and rn seed?
+import os
+
 random.seed(262656)
 
 # Data Types
@@ -317,11 +319,7 @@ def done_beep():
     # freq = 440  # Hz
     os.system('play --no-show-progress --null --channels 1 synth %s sine %f' % (duration, freq))
 
-def preprocess_audio_and_midi():
-    #Windows
-    # directory_str_audio = "C:/Users/Lilly/audio_and_midi/audio"
-    #Ubuntu (Linux)
-    directory_str = "/home/lilly/Downloads/audio_midi/"
+def preprocess_audio_and_midi(directory_str):
     audio_files = find_audio_files(directory_str)
     cqt_segments = []
     all_songs_encoded_midi_segments = []
@@ -397,6 +395,7 @@ def preprocess_audio_and_midi():
 
 
     # pickle time!
+
     with open('cqt_segments_midi_segments.pkl', 'wb') as handle:
         pickle.dump(cqt_segments, handle)
         pickle.dump(all_songs_encoded_midi_segments, handle)
@@ -407,7 +406,7 @@ def preprocess_audio_and_midi():
     return
 
 def main():
-    preprocess_audio_and_midi()
+    preprocess_audio_and_midi(directory_str)
 
 if __name__ == '__main__':
     start_time = time.time()
