@@ -2,9 +2,10 @@ from create_dataset import preprocess_audio_and_midi
 import pickle
 from sklearn.model_selection import train_test_split
 import os
-from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.layers import Dropout, Flatten, Dense
+from keras.layers import Conv1D, MaxPooling1D, GlobalAveragePooling1D
+from keras.layers import Dropout, Flatten, Dense, Activation
 from keras.models import Sequential
+import numpy as np
 
 def pickle_if_not_pickled():
     try:
@@ -24,25 +25,33 @@ def pickle_if_not_pickled():
 
 def split_and_model_architecture(cqt_segments, midi_segments): #TODO: Validation set as well?
     cqt_train, cqt_test, midi_train, midi_test = train_test_split(cqt_segments, midi_segments, test_size=0.25, random_state=21) #shuffles before splitting
+
+    cqt_train_array = np.array(cqt_train)
+    midi_train_array = np.array(midi_train)
+    midi_train_array_flattened = np.ndarray.flatten(midi_train_array)
     example_cqt_segment = cqt_segments[0]
     input_height, input_width = example_cqt_segment.shape
+    cqt_train_array_shape = cqt_train_array.shape
+    example_midi = midi_segments[0]
+    output_height, output_width = example_midi.shape
     num_training_cqts = len(cqt_train)
+
+
     model = Sequential()
 
-    # Define your architecture.
-    model.add(Conv2D(filters=16, kernel_size=2, padding='valid', activation='relu',
-                     input_shape=(input_height, input_width, None))) #173, 84
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(Conv2D(filters=32, kernel_size=2, padding='valid', activation='relu'))
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(Conv2D(filters=64, kernel_size=2, padding='valid', activation='relu'))
-    model.add(MaxPooling2D(pool_size=2))
-    model.add(GlobalAveragePooling2D(data_format='channels_last'))
-    model.add(Dense(133, activation='softmax'))
+    # # Define your architecture.
+    # model.add(Dense(input_dim=input_width, output_dim=500))
+    # model.add(Activation('relu'))
+    # model.add(Dense(input_dim=500, output_dim=output_width))
+
+    model.add(Conv1D(filters=16, kernel_size=2, padding='valid', activation='relu',
+                     input_shape=(input_height, input_width, 1)))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Dense((output_height, output_width), activation='softmax'))
     model.summary()
 
     model.compile(loss='mean_squared_error',
-              optimizer='sgd', metrics=['acc'])
+              optimizer='sgd')
 
     from keras.callbacks import ModelCheckpoint
     # specify the number of epochs that you would like to use to train the model.
@@ -50,8 +59,8 @@ def split_and_model_architecture(cqt_segments, midi_segments): #TODO: Validation
     checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.from_scratch.hdf5',
                                    verbose=1, save_best_only=True)
 
-    model.fit(cqt_train, midi_train,
-              epochs=epochs, batch_size=20, callbacks=[checkpointer], verbose=1)
+    model.fit(cqt_train_array, midi_train_array_flattened,
+              epochs=epochs, batch_size=1, callbacks=[checkpointer], verbose=1)
 
 def depickle_and_model_architecture():
     cqt_segments, midi_segments = pickle_if_not_pickled()
