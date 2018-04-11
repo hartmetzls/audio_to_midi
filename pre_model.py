@@ -5,10 +5,7 @@ import os
 import numpy as np
 import random
 
-## extra imports to set GPU options
-# #TODO: ASK Lou why this fix works? (For error ...GetConvolveAlgorithms... (see Capstone google doc))
-# ie I only have one GPU...how was it not visible to tf as device 0?
-#
+## env var to set GPU options#
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Includes layer options to be tried later
@@ -36,8 +33,8 @@ def pickle_if_not_pickled():
 def split_and_reshape_for_conv2d(cqt_segments, midi_segments):
 
     #a_few_examples vars created for quick testing
-    cqt_segments_a_few_examples = cqt_segments[:40]
-    midi_segments_a_few_examples = midi_segments[:40]
+    cqt_segments_a_few_examples = cqt_segments[:10]
+    midi_segments_a_few_examples = midi_segments[:10]
 
     # shuffles before splitting by default
     cqt_train_and_valid, cqt_test, midi_train_and_valid, midi_test = train_test_split(
@@ -53,11 +50,6 @@ def split_and_reshape_for_conv2d(cqt_segments, midi_segments):
     cqt_test_array = np.array(cqt_test)
     midi_test_array = np.array(midi_test)
 
-    #makes output 1D (This is potentially only a hold-over until I find out how to have 2D output with a CNN)
-    midi_train_array_flattened = np.ndarray.flatten(midi_train_array)
-    midi_valid_array_flattened = np.ndarray.flatten(midi_valid_array)
-    midi_test_array_flattened = np.ndarray.flatten(midi_test_array)
-
     example_cqt_segment = cqt_segments[0]
     input_height, input_width = example_cqt_segment.shape
 
@@ -70,30 +62,31 @@ def split_and_reshape_for_conv2d(cqt_segments, midi_segments):
     num_validation_cqts = len(cqt_valid_array)
     num_testing_cqts = len(cqt_test_array)
 
-    #adds depth dimension to cqt segment (necessary for Conv2D i believe?)
+    #adds depth dimension to cqt segment (necessary for Conv2D)
     cqt_train_array_reshaped = cqt_train_array.reshape(num_training_cqts, input_height, input_width, 1)
     cqt_valid_array_reshaped = cqt_valid_array.reshape(num_validation_cqts, input_height, input_width, 1)
     cqt_test_array_reshaped = cqt_test_array.reshape(num_testing_cqts, input_height, input_width, 1)
 
-    #reshape (necessary for Conv2D i believe?)
+    #reshape (necessary for Conv2D)
     one_D_array_len = output_height * output_width
-    midi_train_array_flattened_reshaped = midi_train_array_flattened.reshape(num_training_cqts, one_D_array_len)
-    midi_valid_array_flattened_reshaped = midi_valid_array_flattened.reshape(num_validation_cqts, one_D_array_len)
-    midi_test_array_flattened_reshaped = midi_test_array_flattened.reshape(num_testing_cqts, one_D_array_len)
+    midi_train_array_reshaped = midi_train_array.reshape(num_training_cqts, one_D_array_len) #(-1,
+    # one_D_array_len) does the same thing
+    midi_valid_array_reshaped = midi_valid_array.reshape(num_validation_cqts, one_D_array_len)
+    midi_test_array_reshaped = midi_test_array.reshape(num_testing_cqts, one_D_array_len)
 
     return cqt_test_array_reshaped, cqt_train_array_reshaped, cqt_valid_array_reshaped, input_height, input_width, \
-           midi_test_array_flattened_reshaped, midi_train_array_flattened_reshaped, \
-           midi_valid_array_flattened_reshaped, one_D_array_len
+           midi_test_array_reshaped, midi_train_array_reshaped, \
+           midi_valid_array_reshaped, one_D_array_len
 
 def conv2d_model(cqt_test_array_reshaped, cqt_train_array_reshaped, cqt_valid_array_reshaped, input_height, input_width,
-                 midi_test_array_flattened_reshaped, midi_train_array_flattened_reshaped,
-                 midi_valid_array_flattened_reshaped, one_D_array_len):
+                 midi_test_array_reshaped, midi_train_array_reshaped,
+                 midi_valid_array_reshaped, one_D_array_len):
     model = Sequential()
     model.add(Conv2D(filters=2, kernel_size=2, strides=1, padding='valid', activation='relu',
                      input_shape=(input_height, input_width, 1)))
     model.add(MaxPooling2D(pool_size=2))
     model.add(Flatten())
-    model.add(Dense(one_D_array_len, activation='softmax'))
+    model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
     model.compile(loss='mean_squared_error',
                   optimizer='sgd')
@@ -101,10 +94,10 @@ def conv2d_model(cqt_test_array_reshaped, cqt_train_array_reshaped, cqt_valid_ar
     filepath = "weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
-    model.fit(cqt_train_array_reshaped, midi_train_array_flattened_reshaped,
-              validation_data=(cqt_valid_array_reshaped, midi_valid_array_flattened_reshaped),
+    model.fit(cqt_train_array_reshaped, midi_train_array_reshaped,
+              validation_data=(cqt_valid_array_reshaped, midi_valid_array_reshaped),
               epochs=epochs, batch_size=1, callbacks=[checkpointer], verbose=1)
-    score = model.evaluate(cqt_test_array_reshaped, midi_test_array_flattened_reshaped)
+    score = model.evaluate(cqt_test_array_reshaped, midi_test_array_reshaped)
     print(score)
 
 def depickle_and_model_architecture():
@@ -112,11 +105,11 @@ def depickle_and_model_architecture():
     np.random.seed(21)
     cqt_segments, midi_segments = pickle_if_not_pickled()
     cqt_test_array_reshaped, cqt_train_array_reshaped, cqt_valid_array_reshaped, input_height, input_width,\
-    midi_test_array_flattened_reshaped, midi_train_array_flattened_reshaped, \
-    midi_valid_array_flattened_reshaped, one_D_array_len = split_and_reshape_for_conv2d(cqt_segments, midi_segments)
+    midi_test_array_reshaped, midi_train_array_reshaped, \
+    midi_valid_array_reshaped, one_D_array_len = split_and_reshape_for_conv2d(cqt_segments, midi_segments)
     conv2d_model(cqt_test_array_reshaped, cqt_train_array_reshaped, cqt_valid_array_reshaped, input_height, input_width,
-                 midi_test_array_flattened_reshaped, midi_train_array_flattened_reshaped,
-                 midi_valid_array_flattened_reshaped, one_D_array_len)
+                 midi_test_array_reshaped, midi_train_array_reshaped,
+                 midi_valid_array_reshaped, one_D_array_len)
 
 def main():
     depickle_and_model_architecture()
