@@ -11,8 +11,8 @@ def benchmark():
     for cqt_segment in cqt_segments:
         random_midi_segment = random.choice(midi_segments)
         results.append(random_midi_segment)
-    midi_segments_array = np.asarray(midi_segments)
-    midi_predicted_array = np.asarray(results)
+    midi_segments_array = np.array(midi_segments)
+    midi_predicted_array = np.array(results)
     midi_segments_array_flattened = np.ndarray.flatten(midi_segments_array)
     midi_predicted_array_flattened = np.ndarray.flatten(midi_predicted_array)
 
