@@ -1,20 +1,24 @@
 from create_dataset import preprocess_audio_and_midi
 import pickle
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import normalize
 import os
 import numpy as np
 import random
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import time
+from copy import deepcopy
 
 ## env var to set GPU options#
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Includes layer options to be tried later
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.layers import Dropout, Flatten, Dense, Activation, Reshape
+from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint
+from keras.constraints import max_norm, min_max_norm
 
 def pickle_if_not_pickled():
     try:
@@ -46,7 +50,7 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     however_many_there_are = -1
     cqt_segments_reshaped = cqt_segments_array.reshape(however_many_there_are, input_height, input_width, 1)
 
-    #reshape output (necessary for Conv2D)
+    #reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
     output_height, output_width = example_midi_segment.shape
     one_D_array_len = output_height * output_width
@@ -59,9 +63,39 @@ def reshape_for_dense(cqt_segments, midi_segments):
     cqt_segments_array = np.array(cqt_segments)
     midi_segments_array = np.array(midi_segments)
 
+
     # a_few_examples vars created for quick testing
-    cqt_segments_array = cqt_segments_array[:20]
-    midi_segments_array = midi_segments_array[:20]
+    # 20000:20010
+    cqt_segments_array = cqt_segments_array[:]
+    midi_segments_array = midi_segments_array[:]
+
+    #debugging:
+    # cqt_segments_array_mean = np.mean(cqt_segments_array)
+
+    #debugging:
+    # check_cqt_infs = np.where(np.isinf(cqt_segments_array))
+    # check_midi_infs = np.where(np.isinf(midi_segments_array))
+    # print(check_cqt_infs)
+    # print(check_midi_infs)
+    # check_cqt_nans = np.where(np.isnan(cqt_segments_array))
+    # check_midi_nans = np.where(np.isnan(midi_segments_array))
+    # print(check_cqt_nans)
+    # print(check_midi_nans)
+
+    # #TODO: Find correct way to NORMALIZE CQTS (if necessary):
+    #Test1: consider each freq bin a feature:
+    cqt_row_min = cqt_segments_array.min(axis=(1, 0), keepdims=True)
+    cqt_row_max = cqt_segments_array.max(axis=(1, 0), keepdims=True)
+    cqt_segments_array_normalized = np.array(cqt_segments_array)
+    for cqt_segment in cqt_segments_array_normalized:
+        for row in cqt_segment:
+
+
+
+
+
+    cqt_segments_array_normalized_mean = np.mean(cqt_segments_array_normalized)
+
 
     example_cqt_segment = cqt_segments_array[0]
     input_height, input_width = example_cqt_segment.shape
@@ -69,9 +103,17 @@ def reshape_for_dense(cqt_segments, midi_segments):
     however_many_there_are = -1
     cqt_segments_reshaped = cqt_segments_array.reshape(however_many_there_are, input_height, input_width)
 
+    # reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
     output_height, output_width = example_midi_segment.shape
-    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, output_height, output_width)
+    one_D_array_len = output_height * output_width
+    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_D_array_len)
+
+    #debugging:
+    cqt_mean = np.mean(cqt_segments_reshaped)
+    midi_mean = np.mean(midi_segments_reshaped)
+    cqt_std = np.std(cqt_segments_reshaped)
+    midi_std = np.std(midi_segments_reshaped)
 
     return cqt_segments_reshaped, midi_segments_reshaped
 
@@ -108,7 +150,7 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     model.summary()
     model.compile(loss=root_mse,
                   optimizer='sgd')
-    epochs = 100
+    epochs = 10
     filepath = "dense_model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
@@ -131,14 +173,17 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
     example_cqt_segment = cqt_train[0]
     input_height, input_width = example_cqt_segment.shape
     example_midi_segment = midi_train[0]
-    output_height, output_width = example_midi_segment.shape
     one_D_array_len = len(example_midi_segment)
     model = Sequential()
-    model.add(Dense(1044, input_shape=(input_height, input_width), activation='relu'))
-    model.add(Dense(???????????, activation='sigmoid'))
+    #weight constraint (below) suggested in comment by f choillet re nan loss for a simple MLP. kernel constraint max norm 2. did not change the nan loss issue
+    # todo: research wtf it actually does and what to set it at
+    model.add(Dense(1044, input_shape=(input_height, input_width), activation='relu', kernel_constraint=min_max_norm(1.)))
+    # TODO: Is it ok to flatten here? I cannot figure out how to get the above output (-1, 84, 1044) to reshape to (-1, 87, 6)
+    model.add(Flatten())
+    model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
     model.compile(loss=root_mse,
-                  optimizer='adam')
+                  optimizer='adam') #trying clipnorm 0.5. (nan vals at 2nd epoch on 1/3 on data w/o)
     epochs = 10
     filepath = "dense_model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
@@ -176,4 +221,6 @@ def main():
     depickle_and_model_architecture()
 
 if __name__ == '__main__':
+    start_time = time.time()
     main()
+    print("--- %s seconds ---" % (time.time() - start_time))
