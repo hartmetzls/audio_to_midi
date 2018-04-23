@@ -1,14 +1,13 @@
 from create_dataset import preprocess_audio_and_midi
+from normalisation import *
 import pickle
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import normalize
 import os
 import numpy as np
 import random
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import time
-from copy import deepcopy
 
 ## env var to set GPU options#
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -19,6 +18,7 @@ from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint
 from keras.constraints import max_norm, min_max_norm
+from keras import optimizers
 
 def pickle_if_not_pickled():
     try:
@@ -66,8 +66,8 @@ def reshape_for_dense(cqt_segments, midi_segments):
 
     # a_few_examples vars created for quick testing
     # 20000:20010
-    cqt_segments_array = cqt_segments_array[100:1300]
-    midi_segments_array = midi_segments_array[100:1300]
+    cqt_segments_array = cqt_segments_array[100:300]
+    midi_segments_array = midi_segments_array[100:300]
 
     #debugging:
     # cqt_segments_array_mean = np.mean(cqt_segments_array)
@@ -82,26 +82,11 @@ def reshape_for_dense(cqt_segments, midi_segments):
     print(check_cqt_nans)
     print(check_midi_nans)
 
-    # #TODO: Find correct way to NORMALIZE CQTS (if necessary):
-    #Test1: consider each freq bin a feature:
-    # cqt_row_min = cqt_segments_array.min(axis=(1, 0), keepdims=True)
-    # cqt_row_max = cqt_segments_array.max(axis=(1, 0), keepdims=True)
-    # cqt_segments_array_normalized = np.array(cqt_segments_array)
-    # for cqt_segment in cqt_segments_array_normalized:
-    #     for row in cqt_segment:
-
-
-
-
-
-    # cqt_segments_array_normalized_mean = np.mean(cqt_segments_array_normalized)
-
 
     example_cqt_segment = cqt_segments_array[0]
     input_height, input_width = example_cqt_segment.shape
 
     however_many_there_are = -1
-    cqt_segments_reshaped = cqt_segments_array.reshape(however_many_there_are, input_height, input_width)
 
     # reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
@@ -109,13 +94,7 @@ def reshape_for_dense(cqt_segments, midi_segments):
     one_D_array_len = output_height * output_width
     midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_D_array_len)
 
-    #debugging:
-    cqt_mean = np.mean(cqt_segments_reshaped)
-    midi_mean = np.mean(midi_segments_reshaped)
-    cqt_std = np.std(cqt_segments_reshaped)
-    midi_std = np.std(midi_segments_reshaped)
-
-    return cqt_segments_reshaped, midi_segments_reshaped
+    return cqt_segments_array, midi_segments_reshaped
 
 def split(cqt_segments_reshaped, midi_segments_reshaped):
     # shuffles before splitting by default
@@ -132,11 +111,11 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     example_cqt_segment = cqt_train[0]
     input_height, input_width, input_depth = example_cqt_segment.shape
     example_midi_segment = midi_train[0]
-    one_D_array_len = len(example_midi_segment)
+    one_D_array_len = len(example_midi_segment )
 
     model = Sequential()
     #TODO: to try 24*1 kernel (column)
-    model.add(Conv2D(filters=2, kernel_size=2, strides=1, padding='valid', activation='relu',
+    model.add(Conv2D(filters=8, kernel_size=(21, 1), strides=1, padding='valid', activation='relu',
                      input_shape=(input_height, input_width, 1))) #valid doesn't go beyond input
     # edge - great for this prob bc we already have padding (most of the time)
     # re freq, however, same is more appropriate (or pad with zeros)
@@ -148,11 +127,12 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     #Make sure EVERY layer in the network has at least as many nodes as the output size (h * w)
     model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
+    adam = optimizers.SGD(lr=0.0001)
     model.compile(loss=root_mse,
-                  optimizer='sgd')
-    epochs = 10
-    filepath = "dense_model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
-    checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
+                  optimizer=adam)
+    epochs = 100
+    filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{val_loss:.4f}.hdf5"
+    checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
     history_for_plotting = model.fit(cqt_train, midi_train,
               validation_data=(cqt_valid, midi_valid),
@@ -185,8 +165,8 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
     model.summary()
     model.compile(loss=root_mse,
                   optimizer='adam') #trying clipnorm 0.5. (nan vals at 2nd epoch on 1/3 on data w/o)
-    epochs = 102
-    filepath = "dense_model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
+    epochs = 100
+    filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
     history_for_plotting = model.fit(cqt_train, midi_train,
@@ -211,12 +191,27 @@ def depickle_and_model_architecture():
     random.seed(21)
     np.random.seed(21)
     cqt_segments, midi_segments = pickle_if_not_pickled()
-    # cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
-    cqt_segments_reshaped, midi_segments_reshaped = reshape_for_dense(cqt_segments, midi_segments)
+    # new code required to run cnn with feature standardization
+    cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
+    # cqt_segments_reshaped, midi_segments_reshaped = reshape_for_dense(cqt_segments, midi_segments)
     cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test = split(
         cqt_segments_reshaped, midi_segments_reshaped)
-    # conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test)
-    dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test)
+
+    # #feature standardization
+    # array_shaped_for_scaler, num_samples, height, width = shape_for_scaler(cqt_train)
+    # scaler = create_scaler(array_shaped_for_scaler)
+    # cqt_train_standardized = feature_standardize_array(array_shaped_for_scaler, scaler, num_samples, height, width)
+    # cqt_valid_shaped_for_scaler, num_valid_samples, height, width = shape_for_scaler(cqt_valid)
+    # cqt_valid_standardized = feature_standardize_array(cqt_valid_shaped_for_scaler, scaler, num_valid_samples, height, width)
+    # cqt_test_shaped_for_scaler, num_test_samples, height, width = shape_for_scaler(cqt_test)
+    # cqt_test_standardized = feature_standardize_array(cqt_test_shaped_for_scaler, scaler, len(cqt_test), height, width)
+    # dense_model(cqt_train_standardized, cqt_valid_standardized, cqt_test_standardized, midi_train, midi_valid,
+    #             midi_test)
+
+    conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test)
+    # dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid,
+    #             midi_test)
+
 
 def main():
     depickle_and_model_architecture()
