@@ -16,7 +16,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
 from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute
 from keras.models import Sequential
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras.constraints import max_norm, min_max_norm
 from keras import optimizers
 
@@ -41,8 +41,8 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     midi_segments_array = np.array(midi_segments)
 
     #a_few_examples vars created for quick testing
-    cqt_segments_array = cqt_segments_array[:]
-    midi_segments_array = midi_segments_array[:]
+    cqt_segments_array = cqt_segments_array[100:150]
+    midi_segments_array = midi_segments_array[100:150]
 
     #adds depth dimension to cqt segment (necessary for Conv2D)
     example_cqt_segment = cqt_segments_array[0]
@@ -114,7 +114,6 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     one_D_array_len = len(example_midi_segment )
 
     model = Sequential()
-    #TODO: to try 24*1 kernel (column)
     model.add(Conv2D(filters=8, kernel_size=(21, 1), strides=1, padding='valid', activation='relu',
                      input_shape=(input_height, input_width, 1))) #valid doesn't go beyond input
     # edge - great for this prob bc we already have padding (most of the time)
@@ -130,13 +129,19 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     adam = optimizers.SGD(lr=0.0001)
     model.compile(loss=root_mse,
                   optimizer=adam)
-    epochs = 100
+    epochs = 10
     filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{val_loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
+
+    #Create a callback tensorboard object:
+    tensorboard = TensorBoard(log_dir='./tensorboard_logs', histogram_freq=0, batch_size=1, write_graph=True,
+                                write_grads=True, write_images=True, embeddings_freq=0,
+                                embeddings_layer_names=None, embeddings_metadata=None)
+
     history_for_plotting = model.fit(cqt_train, midi_train,
               validation_data=(cqt_valid, midi_valid),
-              epochs=epochs, batch_size=1, callbacks=[checkpointer], verbose=1)
+              epochs=epochs, batch_size=1, callbacks=[checkpointer, tensorboard], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
     print(score)
     #summarize history for loss
