@@ -1,4 +1,4 @@
-from create_dataset import preprocess_audio_and_midi
+from create_dataset import preprocess_audio_and_midi, done_beep
 from normalisation import *
 import pickle
 from sklearn.model_selection import train_test_split
@@ -14,11 +14,12 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 # Includes layer options to be tried later
 from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute
+from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute, BatchNormalization
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras.constraints import max_norm, min_max_norm
 from keras import optimizers
+from keras import backend as K
 
 def pickle_if_not_pickled():
     try:
@@ -41,8 +42,8 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     midi_segments_array = np.array(midi_segments)
 
     #a_few_examples vars created for quick testing
-    cqt_segments_array = cqt_segments_array[100:150]
-    midi_segments_array = midi_segments_array[100:150]
+    cqt_segments_array = cqt_segments_array[:]
+    midi_segments_array = midi_segments_array[:]
 
     #adds depth dimension to cqt segment (necessary for Conv2D)
     example_cqt_segment = cqt_segments_array[0]
@@ -53,9 +54,8 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     #reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
     output_height, output_width = example_midi_segment.shape
-    one_D_array_len = output_height * output_width
-    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_D_array_len) #(-1,
-    # one_D_array_len) does the same thing as num_segments, oneDaray len
+    one_d_array_len = output_height * output_width
+    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_d_array_len)
 
     return cqt_segments_reshaped, midi_segments_reshaped
 
@@ -65,9 +65,8 @@ def reshape_for_dense(cqt_segments, midi_segments):
 
 
     # a_few_examples vars created for quick testing
-    # 20000:20010
-    cqt_segments_array = cqt_segments_array[100:300]
-    midi_segments_array = midi_segments_array[100:300]
+    cqt_segments_array = cqt_segments_array[:]
+    midi_segments_array = midi_segments_array[:]
 
     #debugging:
     # cqt_segments_array_mean = np.mean(cqt_segments_array)
@@ -114,22 +113,24 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     one_D_array_len = len(example_midi_segment )
 
     model = Sequential()
-    model.add(Conv2D(filters=8, kernel_size=(21, 1), strides=1, padding='valid', activation='relu',
+    # doc indicates kernel size is width, height. One github comment confirms my suspicion that it is in fact height, width)
+    model.add(Conv2D(filters=12, kernel_size=(1, 14), strides=(1, 6), padding='valid', activation='relu',
                      input_shape=(input_height, input_width, 1))) #valid doesn't go beyond input
     # edge - great for this prob bc we already have padding (most of the time)
     # re freq, however, same is more appropriate (or pad with zeros)
-
-    #pooling is mostly for reducing dimensionality, but you don't need that so much (compared to
-    # a classification problem)
-    model.add(MaxPooling2D(pool_size=2))
+    model.add(Conv2D(filters=8, kernel_size=(1, 4), strides=(1, 2), padding='valid', activation='relu'))
+    model.add(Conv2D(filters=4, kernel_size=(1, 2), strides=(1, 2), padding='valid', activation='relu'))
+    # #pooling is mostly for reducing dimensionality, but you don't need that so much (compared to
+    # # a classification problem)
     model.add(Flatten())
     #Make sure EVERY layer in the network has at least as many nodes as the output size (h * w)
     model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
-    adam = optimizers.SGD(lr=0.0001)
+    adam = optimizers.adam(lr=0.0001, decay=.00001)
     model.compile(loss=root_mse,
-                  optimizer=adam)
-    epochs = 10
+                  optimizer=adam,
+                  metrics=[root_mse, 'mae', r2_coeff_determination])
+    epochs = 100
     filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{val_loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
@@ -141,17 +142,21 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
 
     history_for_plotting = model.fit(cqt_train, midi_train,
               validation_data=(cqt_valid, midi_valid),
-              epochs=epochs, batch_size=1, callbacks=[checkpointer, tensorboard], verbose=1)
+              epochs=epochs, batch_size=32, callbacks=[checkpointer, tensorboard], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
+    done_beep()
     print(score)
     #summarize history for loss
     #https://machinelearningmastery.com/display-deep-learning-model-training-history-in-keras/
     plt.plot(history_for_plotting.history['loss'])
     plt.plot(history_for_plotting.history['val_loss'])
+    plt.plot(history_for_plotting.history['root_mse'])
+    plt.plot(history_for_plotting.history['mean_absolute_error'])
+    plt.plot(history_for_plotting.history['r2_coeff_determination'])
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc='upper left')
+    plt.legend(['train', 'validation', 'rmse', 'mae', 'r2'], loc='lower left')
     plt.show()
 
 def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test):
@@ -170,7 +175,7 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
     model.summary()
     model.compile(loss=root_mse,
                   optimizer='adam') #trying clipnorm 0.5. (nan vals at 2nd epoch on 1/3 on data w/o)
-    epochs = 100
+    epochs = 18
     filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
@@ -178,6 +183,7 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
                                      validation_data=(cqt_valid, midi_valid),
                                      epochs=epochs, batch_size=1, callbacks=[checkpointer], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
+
     print(score)
     # summarize history for loss
     # https://machinelearningmastery.com/display-deep-learning-model-training-history-in-keras/
@@ -190,7 +196,15 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
     plt.show()
 
 def root_mse(y_true, y_pred):
+    # returns tensorflow.python.framework.ops.Tensor
     return tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(y_true, y_pred))))
+
+#https://jmlb.github.io/ml/2017/03/20/CoeffDetermination_CustomMetric4Keras/
+def r2_coeff_determination(y_true, y_pred):
+    SS_res = K.sum(K.square(y_true - y_pred))
+    SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
+    #epsilon avoids division by zero
+    return (1 - SS_res / (SS_tot + K.epsilon()))
 
 def depickle_and_model_architecture():
     random.seed(21)

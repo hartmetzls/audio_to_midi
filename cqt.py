@@ -25,15 +25,6 @@ def audio_segments_cqt(audio_segment_time_series, sr):
     #We don't care about the imaginary part bc we don't care where in the wave we are when we
     #  start reading it
 
-    #visualize cqt
-    # CQT = librosa.amplitude_to_db(cqt_of_segment, ref=np.max)
-    # # stft = librosa.core.stft(time_series_and_sr[0])
-    # # print("stft:", stft.shape)
-    # librosa.display.specshow(CQT, y_axis='cqt_note')
-    # plt.colorbar(format='%+2.0f dB')
-    # plt.show()
-    # return cqt_of_segment
-
 def main():
     # compare_beats("C:/Users/Lilly/audio_and_midi/audio/Bach_BWV871-02_002_20090916-SMD.wav")
     # compare_beats("C:/Users/Lilly/audio_and_midi/audio/Bartok_SZ080-02_002_20110315-SMD.wav")
