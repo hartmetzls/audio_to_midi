@@ -41,6 +41,16 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     cqt_segments_array = np.array(cqt_segments)
     midi_segments_array = np.array(midi_segments)
 
+    #min and max (exploring re normalisation)
+    min = np.amin(cqt_segments_array)
+    max = np.amax(cqt_segments_array)
+    min_0 = np.min(cqt_segments_array, axis=0)
+    max_0 = np.max(cqt_segments_array, axis = 0)
+    min_1 = np.min(cqt_segments_array, axis=1)
+    max_1 = np.max(cqt_segments_array, axis=1)
+    min_2 = np.min(cqt_segments_array, axis=2)
+    max_2 = np.max(cqt_segments_array, axis=2)
+
     #a_few_examples vars created for quick testing
     cqt_segments_array = cqt_segments_array[:]
     midi_segments_array = midi_segments_array[:]
@@ -114,6 +124,9 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
 
     model = Sequential()
     # doc indicates kernel size is width, height. One github comment confirms my suspicion that it is in fact height, width)
+    #try more layers, convolutions in other direction (kernel n, 1) & pad with same or zeros and
+    # stride must be 1, 1, 1,7; try batch size 1000; put metrics on diff graph; no more than
+    # about 20000
     model.add(Conv2D(filters=12, kernel_size=(1, 14), strides=(1, 6), padding='valid', activation='relu',
                      input_shape=(input_height, input_width, 1))) #valid doesn't go beyond input
     # edge - great for this prob bc we already have padding (most of the time)

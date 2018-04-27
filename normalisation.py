@@ -41,9 +41,9 @@ def feature_standardize_array(array_shaped_for_scaler, scaler, num_samples, heig
 #
 # print('og:')
 # #is it valid to normalize overall rather than by bin?
-# cqt_segments_array = [[[-11, 2], [1, 2]],
-#                       [[-8, -2], [1, 10]]
-#                       ]
+cqt_segments_array = [[[-11, 2], [1, 2]],
+                      [[-8, -2], [1, 10]]
+                      ]
 # cqt_segments_array = np.array(cqt_segments_array)
 # print(cqt_segments_array)
 #
@@ -86,6 +86,11 @@ def main():
     #                    [1, 2, 1, 1, 1, 1, 1]]
     #                   ]
     # three_d_array = np.array(three_d_array)
+
+    three_d_array = [[[-11, 2], [1, 2]],
+                          [[-8, -2], [1, 10]]
+                          ]
+    three_d_array = np.array(three_d_array)
 
     array_shaped_for_scaler, num_samples, height, width = shape_for_scaler(three_d_array)
     scaler = create_scaler(array_shaped_for_scaler)
