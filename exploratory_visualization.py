@@ -9,13 +9,18 @@ def main():
     random_index = np.random.randint(len(cqt_segments))
     example_cqt_segment = cqt_segments[random_index]
 
-    # visualize cqt power spectrum
-    CQT = librosa.amplitude_to_db(example_cqt_segment, ref=np.max)
-    librosa.display.specshow(CQT, x_axis='time', y_axis='cqt_note')
+    # flip cqt to match midi heatmap y axis
+    cqt_low_notes_at_top = np.flipud(example_cqt_segment)
+
+    # visualize cqt power spectrum (for one segment)
+    librosa.display.specshow(cqt_low_notes_at_top, sr=22050 * 4, x_axis='time', y_axis='cqt_note')
+    # alternate visualization
+    # CQT = librosa.amplitude_to_db(example_cqt_segment, ref=np.max)
+    # librosa.display.specshow(CQT, sr=22050 * 4, x_axis='time', y_axis='cqt_note')
     plt.colorbar(format='%+2.0f dB')
     plt.show()
 
-    # visualize a cqt heatmap and it's corresponding midi heatmap
+    # visualize a cqt heatmap and it's corresponding midi heatmap (for one segment)
     plt.imshow(example_cqt_segment, cmap='hot', interpolation='nearest')
     plt.show()
     example_midi = midi_segments[random_index]

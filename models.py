@@ -1,5 +1,4 @@
 from create_dataset import preprocess_audio_and_midi, done_beep
-from normalisation import *
 import pickle
 from sklearn.model_selection import train_test_split
 import os
@@ -9,15 +8,13 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import time
 
-## env var to set GPU options#
+# env var to set GPU options
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-# Includes layer options to be tried later
-from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D
-from keras.layers import Dropout, Flatten, Dense, Activation, Reshape, Permute, BatchNormalization
+from keras.layers import Conv2D
+from keras.layers import Flatten, Dense
 from keras.models import Sequential
 from keras.callbacks import ModelCheckpoint, TensorBoard
-from keras.constraints import max_norm, min_max_norm
 from keras import optimizers
 from keras import backend as K
 
@@ -41,17 +38,7 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     cqt_segments_array = np.array(cqt_segments)
     midi_segments_array = np.array(midi_segments)
 
-    #min and max (exploring re normalisation)
-    min = np.amin(cqt_segments_array)
-    max = np.amax(cqt_segments_array)
-    min_0 = np.min(cqt_segments_array, axis=0)
-    max_0 = np.max(cqt_segments_array, axis = 0)
-    min_1 = np.min(cqt_segments_array, axis=1)
-    max_1 = np.max(cqt_segments_array, axis=1)
-    min_2 = np.min(cqt_segments_array, axis=2)
-    max_2 = np.max(cqt_segments_array, axis=2)
-
-    #a_few_examples vars created for quick testing
+    # this is a convenient place to choose to run a portion of the dataset (for quick testing)
     cqt_segments_array = cqt_segments_array[:]
     midi_segments_array = midi_segments_array[:]
 
@@ -73,15 +60,11 @@ def reshape_for_dense(cqt_segments, midi_segments):
     cqt_segments_array = np.array(cqt_segments)
     midi_segments_array = np.array(midi_segments)
 
-
-    # a_few_examples vars created for quick testing
+    # this is a convenient place to choose to run a portion of the dataset (for quick testing)
     cqt_segments_array = cqt_segments_array[:]
     midi_segments_array = midi_segments_array[:]
 
-    #debugging:
-    # cqt_segments_array_mean = np.mean(cqt_segments_array)
-
-    # debugging:
+    # debugging nan loss:
     check_cqt_infs = np.where(np.isinf(cqt_segments_array))
     check_midi_infs = np.where(np.isinf(midi_segments_array))
     print(check_cqt_infs)
@@ -90,7 +73,6 @@ def reshape_for_dense(cqt_segments, midi_segments):
     check_midi_nans = np.where(np.isnan(midi_segments_array))
     print(check_cqt_nans)
     print(check_midi_nans)
-
 
     example_cqt_segment = cqt_segments_array[0]
     input_height, input_width = example_cqt_segment.shape
@@ -114,29 +96,26 @@ def split(cqt_segments_reshaped, midi_segments_reshaped):
     return cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test
 
 def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test):
-    #BTW it is not expected that a CNN should be able to take a input of any shape (even if it
-    # had the correct number of dims). These numbers (input height, weight, output len) could
-    # reasonably be hard-coded vars.
+    print("num training examples:")
+    print(len(cqt_train))
     example_cqt_segment = cqt_train[0]
     input_height, input_width, input_depth = example_cqt_segment.shape
     example_midi_segment = midi_train[0]
     one_D_array_len = len(example_midi_segment )
 
     model = Sequential()
-    # doc indicates kernel size is width, height. One github comment confirms my suspicion that it is in fact height, width)
-    #try more layers, convolutions in other direction (kernel n, 1) & pad with same or zeros and
-    # stride must be 1, 1, 1,7; try batch size 1000; put metrics on diff graph; no more than
-    # about 20000
-    model.add(Conv2D(filters=12, kernel_size=(1, 14), strides=(1, 6), padding='valid', activation='relu',
-                     input_shape=(input_height, input_width, 1))) #valid doesn't go beyond input
-    # edge - great for this prob bc we already have padding (most of the time)
-    # re freq, however, same is more appropriate (or pad with zeros)
-    model.add(Conv2D(filters=8, kernel_size=(1, 4), strides=(1, 2), padding='valid', activation='relu'))
-    model.add(Conv2D(filters=4, kernel_size=(1, 2), strides=(1, 2), padding='valid', activation='relu'))
-    # #pooling is mostly for reducing dimensionality, but you don't need that so much (compared to
-    # # a classification problem)
+    model.add(Conv2D(filters=2, kernel_size=(1, 2), strides=(1), padding='same', activation='relu',
+                         input_shape=(input_height, input_width, 1)))
+    model.add(Conv2D(filters=2, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
+    model.add(Conv2D(filters=3, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
+    model.add(Conv2D(filters=3, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
+    for i in range(2):
+        model.add(Conv2D(filters=4, kernel_size=(1, 2), strides=(1, 2), padding='same', activation='relu'))
+    for i in range(3):
+        model.add(Conv2D(filters=5, kernel_size=(1, 2), strides=(1, 2), padding='same', activation='relu'))
+    model.add(Conv2D(filters=6, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
+
     model.add(Flatten())
-    #Make sure EVERY layer in the network has at least as many nodes as the output size (h * w)
     model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
     adam = optimizers.adam(lr=0.0001, decay=.00001)
@@ -148,7 +127,7 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
 
-    #Create a callback tensorboard object:
+    # create a callback tensorboard object:
     tensorboard = TensorBoard(log_dir='./tensorboard_logs', histogram_freq=0, batch_size=1, write_graph=True,
                                 write_grads=True, write_images=True, embeddings_freq=0,
                                 embeddings_layer_names=None, embeddings_metadata=None)
@@ -158,18 +137,36 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
               epochs=epochs, batch_size=32, callbacks=[checkpointer, tensorboard], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
     done_beep()
-    print(score)
+    total_time = time.time() - start_time
+    print("--- %s seconds ---" % (total_time))
+    print("each epoch:")
+    print(total_time / epochs)
+
+    # # test run only
+    # print(score)
+
     #summarize history for loss
     #https://machinelearningmastery.com/display-deep-learning-model-training-history-in-keras/
     plt.plot(history_for_plotting.history['loss'])
     plt.plot(history_for_plotting.history['val_loss'])
-    plt.plot(history_for_plotting.history['root_mse'])
-    plt.plot(history_for_plotting.history['mean_absolute_error'])
-    plt.plot(history_for_plotting.history['r2_coeff_determination'])
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.legend(['train', 'validation', 'rmse', 'mae', 'r2'], loc='lower left')
+    plt.legend(['train rmse', 'validation rmse'], loc='upper right')
+    plt.show()
+
+    plt.plot(history_for_plotting.history['r2_coeff_determination'])
+    plt.title('r2')
+    plt.ylabel('r2_coeff_determination')
+    plt.xlabel('epoch')
+    plt.legend(['r2'], loc='upper left')
+    plt.show()
+
+    plt.plot(history_for_plotting.history['mean_absolute_error'])
+    plt.title('mae')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['mae'], loc='upper right')
     plt.show()
 
 def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test):
@@ -178,17 +175,13 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
     example_midi_segment = midi_train[0]
     one_D_array_len = len(example_midi_segment)
     model = Sequential()
-    #weight constraint (below) suggested in comment by f choillet re nan loss for a simple MLP. kernel constraint max norm 2. did not change the nan loss issue
-    # todo: research wtf it actually does and what to set it at
-    # kernel_constraint = min_max_norm(1.)
     model.add(Dense(1044, input_shape=(input_height, input_width), activation='relu'))
-    # TODO: Is it ok to flatten here? I cannot figure out how to get the above output (-1, 84, 1044) to reshape to (-1, 87, 6)
     model.add(Flatten())
     model.add(Dense(one_D_array_len, activation='sigmoid'))
     model.summary()
     model.compile(loss=root_mse,
-                  optimizer='adam') #trying clipnorm 0.5. (nan vals at 2nd epoch on 1/3 on data w/o)
-    epochs = 18
+                  optimizer='adam')
+    epochs = 100
     filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='loss',
                                    verbose=1, save_best_only=True, save_weights_only=False)
@@ -197,7 +190,6 @@ def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_tes
                                      epochs=epochs, batch_size=1, callbacks=[checkpointer], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
 
-    print(score)
     # summarize history for loss
     # https://machinelearningmastery.com/display-deep-learning-model-training-history-in-keras/
     plt.plot(history_for_plotting.history['loss'])
@@ -212,43 +204,29 @@ def root_mse(y_true, y_pred):
     # returns tensorflow.python.framework.ops.Tensor
     return tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(y_true, y_pred))))
 
-#https://jmlb.github.io/ml/2017/03/20/CoeffDetermination_CustomMetric4Keras/
+# https://jmlb.github.io/ml/2017/03/20/CoeffDetermination_CustomMetric4Keras/
 def r2_coeff_determination(y_true, y_pred):
     SS_res = K.sum(K.square(y_true - y_pred))
     SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
-    #epsilon avoids division by zero
+    # epsilon avoids division by zero
     return (1 - SS_res / (SS_tot + K.epsilon()))
 
 def depickle_and_model_architecture():
     random.seed(21)
     np.random.seed(21)
     cqt_segments, midi_segments = pickle_if_not_pickled()
-    # new code required to run cnn with feature standardization
     cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
     # cqt_segments_reshaped, midi_segments_reshaped = reshape_for_dense(cqt_segments, midi_segments)
     cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test = split(
         cqt_segments_reshaped, midi_segments_reshaped)
-
-    # #feature standardization
-    # array_shaped_for_scaler, num_samples, height, width = shape_for_scaler(cqt_train)
-    # scaler = create_scaler(array_shaped_for_scaler)
-    # cqt_train_standardized = feature_standardize_array(array_shaped_for_scaler, scaler, num_samples, height, width)
-    # cqt_valid_shaped_for_scaler, num_valid_samples, height, width = shape_for_scaler(cqt_valid)
-    # cqt_valid_standardized = feature_standardize_array(cqt_valid_shaped_for_scaler, scaler, num_valid_samples, height, width)
-    # cqt_test_shaped_for_scaler, num_test_samples, height, width = shape_for_scaler(cqt_test)
-    # cqt_test_standardized = feature_standardize_array(cqt_test_shaped_for_scaler, scaler, len(cqt_test), height, width)
-    # dense_model(cqt_train_standardized, cqt_valid_standardized, cqt_test_standardized, midi_train, midi_valid,
-    #             midi_test)
-
     conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test)
     # dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid,
     #             midi_test)
-
 
 def main():
     depickle_and_model_architecture()
 
 if __name__ == '__main__':
+    # set start time here in order to clock runtime (incl. time per epoch) before metrics plots show
     start_time = time.time()
     main()
-    print("--- %s seconds ---" % (time.time() - start_time))

@@ -1,7 +1,7 @@
 import numpy as np
 
 def decode_midi_segment(encoded_segment, midi_segment_length, num_discrete_time_values, lowest):
-    lowest = 21  # value for the entire dataset
+    lowest = 21  # value for the entire SMD dataset
     decoded_midi_segment = []
 
     notes_on, times_on = np.where(encoded_segment == 1) #tuple of arrays of x and y indices where a given condition holds in an array.3.0
