@@ -367,6 +367,11 @@ def preprocess_audio_and_midi(directory_str):
     return
 
 def main():
+    # You must set directory str to be the filepath to your directory containing 2 directories: one named "audio"
+    # (containing the
+    # audio files) and one named "midi" (containing the MIDI files). For example, "C:/Users/Lilly/audio_and_midi/" or
+    # "/home/lilly/Downloads/audio_midi/"
+    # directory_str = ""
     preprocess_audio_and_midi(directory_str)
 
 if __name__ == '__main__':

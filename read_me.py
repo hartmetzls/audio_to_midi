@@ -1,18 +1,16 @@
-# Obtain dataset:
+# OBTAIN DATASET
+# To get started, download the data from the Saarland Music dataset, putting the audio in one directory named "audio" and
+# the MIDI in another directory called "midi":
 
-# BUILD FROM SCRATCH
-# Download music from Saarland Music dataset:
 # mkdir audio
 # wget "http://resources.mpi-inf.mpg.de/SMD/SMD_MIDI-Audio-Piano-Music.html" -e robots=off -r -l1 -nd --no-parent -A.mp3
 # mkdir midi
 # wget "http://resources.mpi-inf.mpg.de/SMD/SMD_MIDI-Audio-Piano-Music.html" -e robots=off -r -l1 -nd --no-parent -A.mid
-# Run create_dataset.
-#
-# OR use your own method to download from
-# http: // resources.mpi-inf.mpg.de / SMD / SMD_MIDI-Audio-Piano-Music.html
-#
-# OR use
-# cqt_segments_midi_segments.pkl
+
+# In create_dataset.py, in the main function, follow the instructions to set directory_str to the filepath where you
+# downloaded the dataset. Run create_dataset. The file models.py contains the code for the final model.
+
+
 
 # Standard necessary libraries:
 # tensorflow

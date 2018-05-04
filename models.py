@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import time
 
 # env var to set GPU options
+# (this was necessary for my machine. comment out line below if it throws an error.)
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from keras.layers import Conv2D
