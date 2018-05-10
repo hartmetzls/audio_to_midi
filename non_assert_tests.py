@@ -2,6 +2,7 @@ from create_dataset import *
 import os
 from os.path import exists
 import shutil
+from models import pickle_if_not_pickled
 
 #NON-ASSERT TESTS
 def difference_between_audio_first_note_onset_and_midi_first_note_on():
@@ -248,6 +249,17 @@ def run_without_errors():
             decoded_midi = decode_midi_segment(midi, midi_segment_length,
                                            num_discrete_time_values, lowest_midi_note)
 
+def min_max_median_mean():
+    cqt_segments, midi_segments = pickle_if_not_pickled()
+    cqt_segments_array = np.array(cqt_segments)
+    cqt_min = np.min(cqt_segments_array)
+    cqt_max = np.max(cqt_segments_array)
+    cqt_median = np.median(cqt_segments_array)
+    cqt_mean = np.mean(cqt_segments_array)
+    midi_segments_array = np.array(midi_segments)
+    midi_median = np.median(midi_segments_array)
+    midi_mean = np.mean(midi_segments_array)
+    print(cqt_mean, midi_mean)
 
 
 
@@ -265,7 +277,8 @@ def main():
     # check_reconstruct_midi_start_after_song_end_non_empty2()
     # catch_audio_no_midi_or_vice_versa()
     # find_lowest_and_highest_midi_note_numbers()
-    run_without_errors()
+    # run_without_errors()
+    min_max_median_mean()
 
 if __name__ == '__main__':
     start_time = time.time()

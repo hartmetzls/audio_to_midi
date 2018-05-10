@@ -1,10 +1,17 @@
+# from numpy.random import seed
+# seed(21)
+# from tensorflow import set_random_seed
+# set_random_seed(21)
+# import random
+# random.seed(21)
+
 from keras.models import load_model
 from models import pickle_if_not_pickled, reshape_for_dense, split, root_mse, reshape_for_conv2d, r2_coeff_determination
+from exploratory_visualization import visualize_cqt, visualize_midi
 import numpy as np
 import matplotlib.pyplot as plt
 from normalisation import *
-import random
-random.seed(21)
+
 import librosa
 import librosa.display
 from sklearn.metrics import mean_squared_error
@@ -25,17 +32,17 @@ def get_model_pred(model, cqt_segment_reshaped, midi_true, midi_height, midi_wid
     midi_pred_rounded_unflattened = np.reshape(midi_pred_rounded, (midi_height, midi_width))
     print("midi_pred_unflattened:")
     midi_true_unflattened = np.reshape(midi_true, (midi_height, midi_width))
-    plt.imshow(midi_pred_unflattened, cmap='hot', interpolation='nearest')
-    plt.show()
+    visualize_midi(midi_pred_unflattened, title='MIDI Prediction')
+
     print("midi_pred_rounded_unflattened:")
-    plt.imshow(midi_pred_rounded_unflattened, cmap='hot', interpolation='nearest')
-    plt.show()
+    visualize_midi(midi_pred_rounded_unflattened, title='MIDI Prediction Rounded')
+
     print("midi_true:")
-    plt.imshow(midi_true_unflattened, cmap='hot', interpolation='nearest')
-    plt.show()
+    visualize_midi(midi_true_unflattened, title='MIDI True')
 
 def main():
     filepath = "model_and_visualizations.1363/weights-improvement-38-0.1363.hdf5"
+    # filepath = "model_checkpoints/previous_run_architectures/weights-improvement-37-0.1344.hdf5"
     model = load_model(filepath,
                        custom_objects={'root_mse': root_mse, 'r2_coeff_determination': r2_coeff_determination})
     cqt_segments, midi_segments = pickle_if_not_pickled()
@@ -56,6 +63,11 @@ def main():
     example_cqt_segment_reshaped = example_cqt_segment.reshape(num_examples, input_height, input_width, input_depth)
     # get_model_pred(model, example_cqt_segment_reshaped, midi_true, midi_height, midi_width)
 
+    valid_score = model.evaluate(cqt_valid, midi_valid)
+    print("valid score:")
+    print("[loss (rmse), root_mse, mae, r2_coeff_determination]")
+    print(valid_score)
+
     # final test score
     score = model.evaluate(cqt_test, midi_test)
     print("[loss (rmse), root_mse, mae, r2_coeff_determination]")
@@ -64,9 +76,8 @@ def main():
     # look at one test example, including the cqt
     num_test_samples = len(cqt_test)
     random_index_test = np.random.randint(num_test_samples)
-
-    # index for the sample referenced in the Justification section
-    # random_index_test = 1498
+    # index for the sample referenced in the Free-form Visualization section
+    random_index_test = 1498
 
     print("random index test:")
     print(random_index_test)
@@ -74,17 +85,11 @@ def main():
 
     # visualize cqt power spectrum (for one segment)
     depth_removed = np.squeeze(example_cqt_segment_test, axis=2)
-    CQT = librosa.amplitude_to_db(depth_removed, ref=np.max)
-    librosa.display.specshow(CQT, sr=22050*4, x_axis='time', y_axis='cqt_note')
-    plt.colorbar(format='%+2.0f dB')
-    plt.show()
+    visualize_cqt(depth_removed)
 
     # alternate visualization: flip cqt to match midi heatmap y axis
     cqt_low_notes_at_top = np.flipud(depth_removed)
-    CQT = librosa.amplitude_to_db(cqt_low_notes_at_top, ref=np.max)
-    librosa.display.specshow(CQT, sr=22050 * 4, x_axis='time', y_axis=None)
-    plt.colorbar(format='%+2.0f dB')
-    plt.show()
+    visualize_cqt(cqt_low_notes_at_top, flipped=True)
 
     midi_true_test = midi_test[random_index_test]
     example_test_cqt_segment_reshaped = example_cqt_segment_test.reshape(

@@ -1,3 +1,10 @@
+# from numpy.random import seed
+# seed(21)
+# from tensorflow import set_random_seed
+# set_random_seed(21)
+# import random
+# random.seed(21)
+
 from create_dataset import preprocess_audio_and_midi, done_beep
 import pickle
 from sklearn.model_selection import train_test_split
@@ -19,6 +26,8 @@ from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras import optimizers
 from keras import backend as K
 
+# if the data is not already in a pkl file in the project directory,
+# save cqt_segments_midi_segments.pkl to project directory
 def pickle_if_not_pickled():
     try:
         with open('cqt_segments_midi_segments.pkl', 'rb') as handle:
@@ -36,6 +45,7 @@ def pickle_if_not_pickled():
     return cqt_segments, midi_segments
 
 def reshape_for_conv2d(cqt_segments, midi_segments):
+    # convert data to np array in order to pass data to keras functions
     cqt_segments_array = np.array(cqt_segments)
     midi_segments_array = np.array(midi_segments)
 
@@ -43,13 +53,13 @@ def reshape_for_conv2d(cqt_segments, midi_segments):
     cqt_segments_array = cqt_segments_array[:]
     midi_segments_array = midi_segments_array[:]
 
-    #adds depth dimension to cqt segment (necessary for Conv2D)
+    # adds depth dimension to cqt segment (necessary for Conv2D)
     example_cqt_segment = cqt_segments_array[0]
     input_height, input_width = example_cqt_segment.shape
     however_many_there_are = -1
     cqt_segments_reshaped = cqt_segments_array.reshape(however_many_there_are, input_height, input_width, 1)
 
-    #reshape output for Flatten layer
+    # reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
     output_height, output_width = example_midi_segment.shape
     one_d_array_len = output_height * output_width
@@ -65,15 +75,15 @@ def reshape_for_dense(cqt_segments, midi_segments):
     cqt_segments_array = cqt_segments_array[:]
     midi_segments_array = midi_segments_array[:]
 
-    # debugging nan loss:
-    check_cqt_infs = np.where(np.isinf(cqt_segments_array))
-    check_midi_infs = np.where(np.isinf(midi_segments_array))
-    print(check_cqt_infs)
-    print(check_midi_infs)
-    check_cqt_nans = np.where(np.isnan(cqt_segments_array))
-    check_midi_nans = np.where(np.isnan(midi_segments_array))
-    print(check_cqt_nans)
-    print(check_midi_nans)
+    # debugging nan loss (referenced in Implementation section)
+    # check_cqt_infs = np.where(np.isinf(cqt_segments_array))
+    # check_midi_infs = np.where(np.isinf(midi_segments_array))
+    # print(check_cqt_infs)
+    # print(check_midi_infs)
+    # check_cqt_nans = np.where(np.isnan(cqt_segments_array))
+    # check_midi_nans = np.where(np.isnan(midi_segments_array))
+    # print(check_cqt_nans)
+    # print(check_midi_nans)
 
     example_cqt_segment = cqt_segments_array[0]
     input_height, input_width = example_cqt_segment.shape
@@ -83,8 +93,8 @@ def reshape_for_dense(cqt_segments, midi_segments):
     # reshape output for Flatten layer
     example_midi_segment = midi_segments_array[0]
     output_height, output_width = example_midi_segment.shape
-    one_D_array_len = output_height * output_width
-    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_D_array_len)
+    one_d_array_len = output_height * output_width
+    midi_segments_reshaped = midi_segments_array.reshape(however_many_there_are, one_d_array_len)
 
     return cqt_segments_array, midi_segments_reshaped
 
@@ -92,17 +102,20 @@ def split(cqt_segments_reshaped, midi_segments_reshaped):
     # shuffles before splitting by default
     cqt_train_and_valid, cqt_test, midi_train_and_valid, midi_test = train_test_split(
         cqt_segments_reshaped, midi_segments_reshaped, test_size=0.2, random_state=21)
+
     cqt_train, cqt_valid, midi_train, midi_valid = train_test_split(
         cqt_train_and_valid, midi_train_and_valid, test_size=0.2, random_state=21)
     return cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test
 
 def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test):
+    # this is a convenient point to confirm whether or not the full dataset is being run
     print("num training examples:")
     print(len(cqt_train))
+
     example_cqt_segment = cqt_train[0]
     input_height, input_width, input_depth = example_cqt_segment.shape
     example_midi_segment = midi_train[0]
-    one_D_array_len = len(example_midi_segment )
+    one_d_array_len = len(example_midi_segment)
 
     model = Sequential()
     model.add(Conv2D(filters=2, kernel_size=(1, 2), strides=(1), padding='same', activation='relu',
@@ -117,7 +130,7 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     model.add(Conv2D(filters=6, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
 
     model.add(Flatten())
-    model.add(Dense(one_D_array_len, activation='sigmoid'))
+    model.add(Dense(one_d_array_len, activation='sigmoid'))
     model.summary()
     adam = optimizers.adam(lr=0.0001, decay=.00001)
     model.compile(loss=root_mse,
@@ -137,14 +150,20 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
               validation_data=(cqt_valid, midi_valid),
               epochs=epochs, batch_size=32, callbacks=[checkpointer, tensorboard], verbose=1)
     score = model.evaluate(cqt_test, midi_test)
+
+    # completely optional. plays a sound when the model finishes running
     done_beep()
+
+    # also optional. times the runtime (thus far) and shows the time per epoch
     total_time = time.time() - start_time
     print("--- %s seconds ---" % (total_time))
     print("each epoch:")
     print(total_time / epochs)
 
-    # # test run only
-    # print(score)
+    # test run only
+    print("test run score:")
+    print("[loss (rmse), root_mse, mae, r2_coeff_determination]")
+    print(score)
 
     #summarize history for loss
     #https://machinelearningmastery.com/display-deep-learning-model-training-history-in-keras/
@@ -213,8 +232,6 @@ def r2_coeff_determination(y_true, y_pred):
     return (1 - SS_res / (SS_tot + K.epsilon()))
 
 def depickle_and_model_architecture():
-    random.seed(21)
-    np.random.seed(21)
     cqt_segments, midi_segments = pickle_if_not_pickled()
     cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
     # cqt_segments_reshaped, midi_segments_reshaped = reshape_for_dense(cqt_segments, midi_segments)

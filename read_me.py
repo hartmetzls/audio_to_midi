@@ -10,11 +10,23 @@
 # In create_dataset.py, in the main function, follow the instructions to set directory_str to the filepath where you
 # downloaded the dataset. Run create_dataset. The file models.py contains the code for the final model.
 
-
-
-# Standard necessary libraries:
-# tensorflow
+# Libraries used:
+#
+# collections
 # keras (incl dependency for keras: conda install h5py)
+# librosa
+# math
+# matplotlib
+# mido
+# ntpath
+# numpy
+# os
+# pickle
+# random
+# scikit-learn
+# shutil
+# tensorflow
+# time
 
 # Install necessary packages to env/virtualenv containing tensorflow:
 # source activate tensorflow
