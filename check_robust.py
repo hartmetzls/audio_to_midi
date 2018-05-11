@@ -4,6 +4,7 @@ from sklearn.model_selection import KFold, train_test_split
 # no GPU support for sklearn's cross_val_score
 from create_dataset import done_beep
 import matplotlib.pyplot as plt
+from models import create_model
 
 def k_fold_cv():
     filepath = "model_and_visualizations.1363/weights-improvement-38-0.1363.hdf5"
@@ -18,11 +19,18 @@ def k_fold_cv():
     k_fold = KFold(n_splits=n_folds)  # Provides train/test indices to split data in train/test sets.
     for train_indices, valid_indices in k_fold.split(cqt_train_and_valid):
         print('Train: %s | valid: %s' % (train_indices, valid_indices))
+    example_cqt_segment = cqt_train_and_valid[0]
+    input_height, input_width, input_depth = example_cqt_segment.shape
+    example_midi_segment = midi_train_and_valid[0]
+    one_d_array_len = len(example_midi_segment)
+
     for i, (train, test) in enumerate(k_fold.split(cqt_train_and_valid)):
         print("Running Fold", i + 1, "/", n_folds)
-        model = None #Clearing the NN # https://github.com/keras-team/keras/issues/1711 KeironO
-        model = load_model(filepath,
-                           custom_objects={'root_mse': root_mse, 'r2_coeff_determination': r2_coeff_determination})
+        # model = None #Clearing the NN # https://github.com/keras-team/keras/issues/1711 KeironO
+        # model = load_model(filepath,
+        #                    custom_objects={'root_mse': root_mse, 'r2_coeff_determination': r2_coeff_determination})
+
+        model = create_model(input_height, input_width, one_d_array_len)
         # saving time (best models have reached best val_score before epoch 40)
         epochs = 50
 

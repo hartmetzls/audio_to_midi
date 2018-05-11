@@ -117,25 +117,8 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     example_midi_segment = midi_train[0]
     one_d_array_len = len(example_midi_segment)
 
-    model = Sequential()
-    model.add(Conv2D(filters=2, kernel_size=(1, 2), strides=(1), padding='same', activation='relu',
-                         input_shape=(input_height, input_width, 1)))
-    model.add(Conv2D(filters=2, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
-    model.add(Conv2D(filters=3, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
-    model.add(Conv2D(filters=3, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
-    for i in range(2):
-        model.add(Conv2D(filters=4, kernel_size=(1, 2), strides=(1, 2), padding='same', activation='relu'))
-    for i in range(3):
-        model.add(Conv2D(filters=5, kernel_size=(1, 2), strides=(1, 2), padding='same', activation='relu'))
-    model.add(Conv2D(filters=6, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
+    model = create_model(input_height, input_width, one_d_array_len)
 
-    model.add(Flatten())
-    model.add(Dense(one_d_array_len, activation='sigmoid'))
-    model.summary()
-    adam = optimizers.adam(lr=0.0001, decay=.00001)
-    model.compile(loss=root_mse,
-                  optimizer=adam,
-                  metrics=[root_mse, 'mae', r2_coeff_determination])
     epochs = 100
     filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{val_loss:.4f}.hdf5"
     checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
@@ -188,6 +171,30 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     plt.xlabel('epoch')
     plt.legend(['mae'], loc='upper right')
     plt.show()
+
+
+def create_model(input_height, input_width, one_d_array_len):
+    """ Creates a model"""
+    model = Sequential()
+    model.add(Conv2D(filters=2, kernel_size=(1, 2), strides=(1), padding='same', activation='relu', input_shape=(input_height, input_width, 1)))
+    model.add(Conv2D(filters=2, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
+    model.add(Conv2D(filters=3, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
+    model.add(Conv2D(filters=3, kernel_size=(7, 1), strides=(1), padding='same', activation='relu'))
+    for i in range(2):
+        model.add(Conv2D(filters=4, kernel_size=(1, 2), strides=(1, 2), padding='same',
+                         activation='relu'))
+    for i in range(3):
+        model.add(Conv2D(filters=5, kernel_size=(1, 2), strides=(1, 2), padding='same',
+                         activation='relu'))
+    model.add(Conv2D(filters=6, kernel_size=(1, 2), strides=(1), padding='same', activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(one_d_array_len, activation='sigmoid'))
+    model.summary()
+    adam = optimizers.adam(lr=0.0001, decay=.00001)
+    model.compile(loss=root_mse,
+                  optimizer=adam,
+                  metrics=[root_mse, 'mae', r2_coeff_determination])
+    return model
 
 def dense_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_test):
     example_cqt_segment = cqt_train[0]
