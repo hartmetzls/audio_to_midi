@@ -172,7 +172,6 @@ def conv2d_model(cqt_train, cqt_valid, cqt_test, midi_train, midi_valid, midi_te
     plt.legend(['mae'], loc='upper right')
     plt.show()
 
-
 def create_model(input_height, input_width, one_d_array_len):
     """ Creates a model"""
     model = Sequential()

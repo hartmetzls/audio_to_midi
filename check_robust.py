@@ -5,17 +5,38 @@ from sklearn.model_selection import KFold, train_test_split
 from create_dataset import done_beep
 import matplotlib.pyplot as plt
 from models import create_model
+import numpy as np
 
 def k_fold_cv():
-    filepath = "model_and_visualizations.1363/weights-improvement-38-0.1363.hdf5"
+    """ Check the robustness of the model using K-Fold CV """
     cqt_segments, midi_segments = pickle_if_not_pickled()
     cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
-    # shuffles before splitting by default
-    cqt_train_and_valid, cqt_test, midi_train_and_valid, midi_test = train_test_split(
-        cqt_segments_reshaped, midi_segments_reshaped, test_size=0.2, random_state=21)
-    # check model robustness with kfold cross val
     n_folds = 5
-    data, labels = cqt_train_and_valid, midi_train_and_valid
+
+    # The goal in this block is to set aside for testing a chunk of data which contains at least
+    # one whole song the network will not have seen before.
+    # Num data points to set aside for testing
+    num_testing = len(cqt_segments_reshaped) * .2
+    # Assuming cqt_segments are still ordered, index 7070 is the start of
+    # Chopin_Op028-17_005, which has 354 segments
+    song_start_index = 7070
+    testing_end_index = song_start_index+num_testing
+    cqt_test, midi_test = cqt_segments_reshaped[song_start_index:testing_end_index], \
+                          midi_segments_reshaped[song_start_index:testing_end_index]
+
+    # remaining data
+    cqt_train_and_valid = cqt_segments_reshaped[:song_start_index] + cqt_segments_reshaped[
+                                                                   testing_end_index:]
+    midi_train_and_valid = midi_segments_reshaped[:song_start_index] + midi_segments_reshaped[
+                                                                   testing_end_index:]
+
+    # Generate a random order of elements
+    # with np.random.permutation and index into the arrays data and classes with those elements
+
+    # shuffle the remaining data:
+    indices = np.random.permutation(len(cqt_train_and_valid))
+    data, labels = cqt_train_and_valid[indices], midi_train_and_valid[indices]
+
     k_fold = KFold(n_splits=n_folds)  # Provides train/test indices to split data in train/test sets.
     for train_indices, valid_indices in k_fold.split(cqt_train_and_valid):
         print('Train: %s | valid: %s' % (train_indices, valid_indices))
@@ -24,23 +45,16 @@ def k_fold_cv():
     example_midi_segment = midi_train_and_valid[0]
     one_d_array_len = len(example_midi_segment)
 
-    for i, (train, test) in enumerate(k_fold.split(cqt_train_and_valid)):
+    for i, (train, valid) in enumerate(k_fold.split(cqt_train_and_valid)):
         print("Running Fold", i + 1, "/", n_folds)
-        # model = None #Clearing the NN # https://github.com/keras-team/keras/issues/1711 KeironO
-        # model = load_model(filepath,
-        #                    custom_objects={'root_mse': root_mse, 'r2_coeff_determination': r2_coeff_determination})
 
         model = create_model(input_height, input_width, one_d_array_len)
         # saving time (best models have reached best val_score before epoch 40)
         epochs = 50
-
-        # train the models using these subsets
-        # (Normally I would not use the same data for validation_data and evaluate,
-        # but I believe in this case it's appropriate in order to visualize signs of over/under -fitting)
         history_for_plotting = model.fit(data[train], labels[train],
-                                         epochs=epochs, verbose=2, validation_data=(data[test], labels[test]))
-
-        valid_score = model.evaluate(data[test], labels[test], verbose=0)
+                                         epochs=epochs, verbose=2, validation_data=(data[valid],
+                                                                                    labels[valid]))
+        valid_score = model.evaluate(cqt_test, midi_test, verbose=0)
         print("valid score:")
         print("[loss (rmse), root_mse, mae, r2_coeff_determination]")
         print(valid_score)
