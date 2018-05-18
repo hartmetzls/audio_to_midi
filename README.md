@@ -1,6 +1,8 @@
 # audio_to_midi
 A CNN which converts piano audio to a simplified MIDI format
 
+Copyright (c) 2018 Lillian Neff
+
 OBTAIN DATASET
 To get started, download the data from the Saarland Music dataset, putting the audio in one directory named "audio" and
 the MIDI in another directory called "midi":
@@ -42,4 +44,4 @@ raise NoBackendError()
 audioread.NoBackendError  
 If you get that error, install FFmpeg: https://www.wikihow.com/Install-FFmpeg-on-Windows  
 The equivalent Linux fix is:  
-sudo apt-get install libav-tools  
+sudo apt-get install libav-tools
