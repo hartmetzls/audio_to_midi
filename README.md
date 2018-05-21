@@ -10,7 +10,7 @@ goal of Automatic Music Transcription (AMT). AMT and Music Information Retrieval
 Audio Workstation software development and music recommendation systems. 
 
 #### Setup
-OBTAIN DATASET
+
 To get started, download the data from the Saarland Music dataset, putting the audio in one directory named "audio" and
 the MIDI in another directory called "midi":
 
@@ -32,9 +32,8 @@ https://www.tensorflow.org/install/
 Keras install instructions:  
 https://keras.io/#installation
 
-######imports:
 collections  
-keras (incl dependency for keras: conda install h5py)  
+keras (see instructions above for dependencies)   
 librosa  
 math  
 matplotlib  
@@ -46,7 +45,7 @@ pickle
 random  
 scikit-learn  
 shutil  
-tensorflow  
+tensorflow (see instructions above for dependencies)   
 time  
 
 
