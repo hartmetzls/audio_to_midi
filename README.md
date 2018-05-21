@@ -21,8 +21,12 @@ mkdir midi
 wget "http://resources.mpi-inf.mpg.de/SMD/SMD_MIDI-Audio-Piano-Music.html" -e robots=off -r -l1 -nd --no-parent -A.mid
 ```  
   
-In create_dataset.py, in the main function, follow the instructions to set directory_str to the filepath where you
-downloaded the dataset. Run create_dataset. The file models.py contains the code for the final model.
+In create_dataset.py, in the ```main``` function, follow the instructions to set directory_str to the filepath where you
+downloaded the dataset. 
+
+Run create_dataset.py. 
+
+The file models.py contains the code for the final model.
 
 #### Libraries
 
