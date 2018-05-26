@@ -6,29 +6,30 @@ from create_dataset import done_beep
 import matplotlib.pyplot as plt
 from models import create_model
 import numpy as np
+from keras.callbacks import ModelCheckpoint
 
 def k_fold_cv():
     """ Check the robustness of the model using K-Fold CV """
     cqt_segments, midi_segments = pickle_if_not_pickled()
     cqt_segments_reshaped, midi_segments_reshaped = reshape_for_conv2d(cqt_segments, midi_segments)
-    n_folds = 5
+    k_folds = 5
 
     # The goal in this block is to set aside for testing a chunk of data which contains at least
     # one whole song the network will not have seen before.
     # Num data points to set aside for testing
-    num_testing = len(cqt_segments_reshaped) * .2
-    # Assuming cqt_segments are still ordered, index 7070 is the start of
-    # Chopin_Op028-17_005, which has 354 segments
-    song_start_index = 7070
-    testing_end_index = song_start_index+num_testing
-    cqt_test, midi_test = cqt_segments_reshaped[song_start_index:testing_end_index], \
-                          midi_segments_reshaped[song_start_index:testing_end_index]
+    num_samples = len(cqt_segments_reshaped)
+    num_testing = int(num_samples * .2)
+    max_desired_test_start_index = num_samples - num_testing - 1 # - 1 is necessary bc of the way the remaining data gets sliced
+    test_set_start_index = np.random.randint(0, max_desired_test_start_index)
+    testing_end_index = test_set_start_index+num_testing
+    cqt_test, midi_test = cqt_segments_reshaped[test_set_start_index:testing_end_index], \
+                          midi_segments_reshaped[test_set_start_index:testing_end_index]
 
     # remaining data
-    cqt_train_and_valid = cqt_segments_reshaped[:song_start_index] + cqt_segments_reshaped[
-                                                                   testing_end_index:]
-    midi_train_and_valid = midi_segments_reshaped[:song_start_index] + midi_segments_reshaped[
-                                                                   testing_end_index:]
+    cqt_train_and_valid = np.concatenate(
+        (cqt_segments_reshaped[:test_set_start_index], cqt_segments_reshaped[testing_end_index:]), axis=0)
+    midi_train_and_valid = np.concatenate(
+        (midi_segments_reshaped[:test_set_start_index], midi_segments_reshaped[testing_end_index:]), axis=0)
 
     # Generate a random order of elements
     # with np.random.permutation and index into the arrays data and classes with those elements
@@ -37,7 +38,7 @@ def k_fold_cv():
     indices = np.random.permutation(len(cqt_train_and_valid))
     data, labels = cqt_train_and_valid[indices], midi_train_and_valid[indices]
 
-    k_fold = KFold(n_splits=n_folds)  # Provides train/test indices to split data in train/test sets.
+    k_fold = KFold(n_splits=k_folds)  # Provides train/test indices to split data in train/test sets.
     for train_indices, valid_indices in k_fold.split(cqt_train_and_valid):
         print('Train: %s | valid: %s' % (train_indices, valid_indices))
     example_cqt_segment = cqt_train_and_valid[0]
@@ -46,18 +47,21 @@ def k_fold_cv():
     one_d_array_len = len(example_midi_segment)
 
     for i, (train, valid) in enumerate(k_fold.split(cqt_train_and_valid)):
-        print("Running Fold", i + 1, "/", n_folds)
+        print("Running Fold", i + 1, "/", k_folds)
 
         model = create_model(input_height, input_width, one_d_array_len)
         # saving time (best models have reached best val_score before epoch 40)
         epochs = 50
-        history_for_plotting = model.fit(data[train], labels[train],
-                                         epochs=epochs, verbose=2, validation_data=(data[valid],
-                                                                                    labels[valid]))
-        valid_score = model.evaluate(cqt_test, midi_test, verbose=0)
-        print("valid score:")
+        filepath = "model_checkpoints/weights-improvement-{epoch:02d}-{val_loss:.4f}.hdf5"
+        checkpointer = ModelCheckpoint(filepath=filepath, monitor='val_loss',
+                                       verbose=1, save_best_only=True, save_weights_only=False)
+        history_for_plotting = model.fit(
+            data[train], labels[train], epochs=epochs, verbose=2, validation_data=(data[valid], labels[valid]),
+            callbacks=[checkpointer])
+        test_score = model.evaluate(cqt_test, midi_test, verbose=0)
+        print("test score:")
         print("[loss (rmse), root_mse, mae, r2_coeff_determination]")
-        print(valid_score)
+        print(test_score)
 
         done_beep()
 
