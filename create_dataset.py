@@ -371,7 +371,7 @@ def main():
     # (containing the
     # audio files) and one named "midi" (containing the MIDI files). For example, "C:/Users/Lilly/audio_and_midi/" or
     # "/home/lilly/Downloads/audio_midi/"
-    # directory_str = ""
+    directory_str = "/home/lilly/Downloads/audio_midi/"
     preprocess_audio_and_midi(directory_str)
 
 if __name__ == '__main__':
